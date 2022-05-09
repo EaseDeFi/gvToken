@@ -8,6 +8,11 @@ on:
 jobs:
   compile-job:
     runs-on: ubuntu-latest
+    env:
+      MNEMONIC: ${{ secrets.MNEMONIC }}
+      INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
+      FORKING: ${{ secrets.FORKING }}
+      BLOCK_NUMBER: ${{ secrets.BLOCK_NUMBER }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
