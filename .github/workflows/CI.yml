@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: "16"
       - run: npm install --save-dev
-      - run: npm run lint
       - run: npm run prettier
+      - run: npm run lint
       - run: npm run compile
       - run: npm run test
