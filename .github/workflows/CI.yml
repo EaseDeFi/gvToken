@@ -1,5 +1,10 @@
 name: ci
-on: [pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
 jobs:
   compile-job:
     runs-on: ubuntu-latest
