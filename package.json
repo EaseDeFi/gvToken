@@ -1,5 +1,7 @@
 {
-  "name": "hardhat-project",
+  "name": "@easedefi/gvtoken",
+  "version": "0.0.1",
+  "description": "easedefi smart contract",
   "scripts": {
     "clean": "shx rm -rf ./artifacts ./cache ./coverage ./src/types ./coverage.json",
     "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
