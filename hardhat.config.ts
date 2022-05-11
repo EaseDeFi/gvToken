@@ -24,6 +24,14 @@ const infuraApiKey: string | undefined = process.env.INFURA_API_KEY;
 if (!infuraApiKey) {
   throw new Error("Please set your INFURA_API_KEY in a .env file");
 }
+const forkingURL: string | undefined = process.env.MAINNET_URL_ALCHEMY;
+if (!forkingURL) {
+  throw new Error("Please set your MAINNET_URL_ALCHEMY in a .env file");
+}
+const forking: string | undefined = process.env.FORKING;
+if (!forking) {
+  throw new Error("Please set your FORKING in a .env file");
+}
 
 // TODO: Replace below accounts with pnemonic
 const accounts: string[] = [];
@@ -92,14 +100,14 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: process.env.MAINNET_URL_ALCHEMY ?? "",
+        url: forkingURL ?? "",
         blockNumber: 14740073,
-        enabled: !!process.env.FORKING,
+        enabled: !!forking,
       },
       accounts: {
         mnemonic,
       },
-      chainId: process.env.FORKING ? 1 : chainIds.hardhat,
+      chainId: forking ? 1 : chainIds.hardhat,
     },
     arbitrumOne: getChainConfig("arbitrumOne"),
     mainnet: getChainConfig("mainnet"),
