@@ -93,7 +93,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: process.env.MAINNET_URL_ALCHEMY ?? "",
-        blockNumber: 14186060,
+        blockNumber: 14740073,
         enabled: !!process.env.FORKING,
       },
       accounts: {

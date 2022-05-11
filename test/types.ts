@@ -1,9 +1,10 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { EaseToken, TokenSwap, IERC20 } from "../src/types";
+import { EaseToken, TokenSwap, IERC20, IVArmor } from "../src/types";
 export type Contracts = {
-  easeToken: EaseToken;
-  armorToken: IERC20;
+  ease: EaseToken;
+  armor: IERC20;
   tokenSwap: TokenSwap;
+  vArmor: IVArmor;
 };
 export type Signers = {
   user: SignerWithAddress;
@@ -13,6 +14,8 @@ export type Signers = {
 };
 
 export type MainnetAddresses = {
-  armorToken: string;
+  armor: string;
   armorWhale: string;
+  vArmor: string;
+  vArmorWhale: string;
 };
