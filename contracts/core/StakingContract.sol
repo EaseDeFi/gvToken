@@ -35,7 +35,7 @@ with each other (what happens if)
 // not be subject to attack like B.protocol did with flash loan.
 // find a way to mitigate them if any
 // Article Topic: 'Flash Loans' Have Made Their Way to Manipulating Protocol Elections
-// Compound's Solution: https://github.com/makerdao/ds-chief/pull/1/files
+// Maker's Solution: https://github.com/makerdao/ds-chief/pull/1/files
 
 abstract contract StakingContract is IStakingContract {
     using SafeERC20 for IEaseToken;
@@ -45,8 +45,6 @@ abstract contract StakingContract is IStakingContract {
     //////////////////////////////////////////////////////////////*/
     uint256 private constant BUFFER = 10**18;
     uint64 private constant MAX_GROW = 52 weeks;
-    // TODO: you can only freeze for 3 months?
-    uint64 private constant MAX_FREEZE = 12 weeks;
     /// @notice max percentage
     uint128 private constant DENOMINATOR = 10000;
 
@@ -87,8 +85,8 @@ abstract contract StakingContract is IStakingContract {
     /*//////////////////////////////////////////////////////////////
                                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(address _easeToken, address gov) {
-        token = IEaseToken(_easeToken);
+    constructor(address easeToken, address gov) {
+        token = IEaseToken(easeToken);
         _gov = gov;
     }
 
@@ -104,16 +102,16 @@ abstract contract StakingContract is IStakingContract {
                     DEPOSIT/WITHDRAW/STAKE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function deposit(uint256 _amount) external {
-        _deposit(uint128(_amount), uint64(block.timestamp), msg.sender);
-        emit Deposit(msg.sender, _amount);
+    function deposit(uint256 amount) external {
+        _deposit(uint128(amount), uint64(block.timestamp), msg.sender);
+        emit Deposit(msg.sender, amount);
     }
 
     // for vArmor holders
     function deposit(
-        uint256 _amount,
-        uint256 _timeStart,
-        bytes32[] memory _proof
+        uint256 amount,
+        uint256 timeStart,
+        bytes32[] memory proof
     ) external {
         // TODO: DISCUSS: Scenario.
         // How we create merkle root so that verification works as expected?
@@ -122,102 +120,128 @@ abstract contract StakingContract is IStakingContract {
         // function and get extra staking timeStart benefit.
         // Need to figure this out.
         bytes32 leaf = keccak256(
-            abi.encodePacked(msg.sender, _amount, _timeStart)
+            abi.encodePacked(msg.sender, amount, timeStart)
         );
         // require this
-        require(MerkleProof.verify(_proof, _powerRoot, leaf), "invalid proof");
-        _deposit(uint128(_amount), uint64(_timeStart), msg.sender);
+        require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
+        _deposit(uint128(amount), uint64(timeStart), msg.sender);
     }
 
     function _deposit(
-        uint128 _amount,
-        uint64 _timeStart,
-        address _user
+        uint128 amount,
+        uint64 timeStart,
+        address user
     ) private {
-        Balance memory userBalance = _balance[_user];
-        if (userBalance.amount == 0) {
-            userBalance.depositStart = _timeStart;
+        Balance memory userBal = _balance[user];
+        if (userBal.amount == 0) {
+            userBal.depositStart = timeStart;
         } else {
             // normalize time
             // (currentBal * startTime + newBal * block.timestamp) / (currentBal + newBal)
-            userBalance.depositStart = uint64(
-                uint256(userBalance.amount) *
-                    uint256(userBalance.depositStart) +
-                    (_amount * _timeStart) /
-                    (uint256(userBalance.amount) + _amount)
+            userBal.depositStart = uint64(
+                uint256(userBal.amount) *
+                    uint256(userBal.depositStart) +
+                    (amount * timeStart) /
+                    (uint256(userBal.amount) + amount)
             );
         }
         // TODO: what happens if user has freezed their balance and try to add
         // more ease tokens to the contract? figure this out
-        if (userBalance.freezeStart + MAX_FREEZE > block.timestamp) {
-            // normalize freeze time
-            // lastFreezeTime * totalFreezedAmount + block.timestamp * newAmount /
-            // (totalFreezedAmount + newAmount)
-            userBalance.freezeStart = uint64(
-                (uint256(userBalance.amount) *
-                    uint256(userBalance.depositStart) +
-                    (_amount * _timeStart)) /
-                    (uint256(userBalance.amount + _amount))
-            );
+        if (
+            userBal.freezeStart != 0 &&
+            ((timeStamp64() - userBal.depositStart) < MAX_GROW)
+        ) {
+            // If we are inside this conditional that means the user is trying
+            // to deposit amount that will normalize time and bring it to growing
+            // phase that means, we need to set freezeStart to zero
+
+            // TODO: should think about a hacky way to not set this thing to zero
+            // to save gas? because if I set to 0 and reset it to freezeStart later
+            // I will have to pay gas to write to a totally new storage
+            userBal.freezeStart = 0;
         }
         // update balance
-        userBalance.amount += _amount;
+        userBal.amount += amount;
 
         // Question: how to know what's up for sale tbh? As user's staked amount
         // is stored in % it's hard to calculate total staked % I think
-        // I may need a staked variable where I can store % staked of the user?
+        // I may need a staked variable where I can store % staked of the user? *SOLVED*
 
         // update address(0) balance that we use to store amount
         // for bribing
         Balance memory forSaleBal = _balance[address(0)];
-        if (forSaleBal.amount > 0) {
+        // amount to increase for sale
+        uint256 saleAmount;
+        uint256 stakePercent = _userStakes[msg.sender];
+        if (stakePercent == 0) {
+            saleAmount = amount;
+        } else {
+            // substracting the staked %
+            saleAmount = (amount * (DENOMINATOR - stakePercent)) / DENOMINATOR;
+        }
+        if (forSaleBal.amount == 0) {
+            forSaleBal.depositStart = timeStart;
+        } else {
             forSaleBal.depositStart = uint64(
                 uint256(forSaleBal.amount) *
                     uint256(forSaleBal.depositStart) +
-                    (_amount * _timeStart) /
-                    (uint256(forSaleBal.amount) + _amount)
+                    (saleAmount * timeStart) /
+                    (uint256(forSaleBal.amount) + saleAmount)
             );
-        } else {
-            forSaleBal.depositStart = _timeStart;
         }
-        forSaleBal.amount += _amount;
+
+        forSaleBal.amount += uint128(saleAmount);
 
         // update for sale balance
         _balance[address(0)] = forSaleBal;
         // update user balance
-        _balance[_user] = userBalance;
+        _balance[user] = userBal;
 
-        token.transferFrom(_user, address(this), _amount);
+        token.transferFrom(user, address(this), amount);
     }
 
-    // TODO: Should there be finalize withdraw for freezed accounts
-    function withdraw(uint128 _amount) external {
-        // calculate reward
-        // check if amount is freezed
+    function withdraw(uint128 amount) external {
+        // Withdraw if not frozen
         address user = msg.sender;
         Balance memory userBal = _balance[user];
-        require(
-            userBal.freezeStart + MAX_FREEZE < block.timestamp,
-            "account frozen"
-        );
+        Balance memory forSaleBal = _balance[address(0)];
+
+        require(userBal.freezeStart != 0, "account frozen");
+        uint256 userStake = _userStakes[user];
+        // amount to deduct from sale
+        uint256 deductForSale = (amount * (DENOMINATOR - userStake)) /
+            DENOMINATOR;
 
         uint256 rewardAmount = _getReward(userBal);
 
-        // TODO: update this with the concern's described below
-        // Update how much is up for bribing
-        // I am considering everything that is ever staked is up for bribe
-        // which is basically wrong but this is just an outline and need to
-        // have a it fast.
-        _balance[address(0)].amount -= _amount;
+        // normalize time
+        forSaleBal.depositStart = uint64(
+            (uint256(forSaleBal.amount) *
+                uint256(forSaleBal.depositStart) -
+                deductForSale *
+                uint256(userBal.depositStart)) /
+                (uint256(forSaleBal.amount) - deductForSale)
+        );
+        if ((userBal.amount - amount) != 0) {
+            //TODO: Normalize time? I think so but only if the time window is within
+            // the growth and decay time
+        }
+        // update balance
+        userBal.amount -= uint128(amount);
+        forSaleBal.amount -= uint128(deductForSale);
 
-        _balance[user].amount -= _amount;
+        amount += uint128(rewardAmount);
+        // UPDATE STORAGE
+        _balance[user] = userBal;
+        _balance[address(0)] = forSaleBal;
 
-        token.safeTransfer(user, _amount + rewardAmount);
+        // transfer to the user
+        token.safeTransfer(user, amount);
 
-        emit Withdraw(user, _amount);
+        emit Withdraw(user, amount);
     }
 
-    function stake(uint256 _balancePercent, address _vault) external {
+    function stake(uint256 balancePercent, address vault) external {
         // Question: Why do we need to stake balance in %?
         // probably best thing to store here would be user's staked %
         // and total staked of a vault? what I think is we don't care which vault
@@ -228,39 +252,30 @@ abstract contract StakingContract is IStakingContract {
         address user = msg.sender;
         // TODO: increase % staked amount of vault
         uint256 userStake = _userStakes[user];
-        userStake += _balancePercent;
+        userStake += balancePercent;
         require(userStake < DENOMINATOR, "can't stake more than 100%");
         // update user staked %
         _userStakes[user] = userStake;
 
         // update amount for bribe
-        uint256 amount = (uint256(_balance[user].amount) * _balancePercent) /
+        uint256 amount = (uint256(_balance[user].amount) * balancePercent) /
             DENOMINATOR;
         _balance[address(0)].amount -= uint128(amount);
 
         // TODO: decrease amountForBribe balance (address(0)) balance
         // thoughts on achieving above. Renormalize the startTime of address(0)
 
-        emit Stake(user, _vault, _balancePercent);
+        emit Stake(user, vault, balancePercent);
     }
 
     // TODO: QUESTION: Do we need this function?
-    function unStake(uint256 _balancePercent, address _vault) external {
+    function unStake(uint256 balancePercent, address vault) external {
         // Unstake from a rca-vault
         // keep power up for sale
     }
 
     function freeze() external {
-        // TODO: may need logic to normalize freeze start time
-        // so that we can handle reboost logic when user calls
-        // freeze while their $gvEASE power is decaying
         Balance memory userBal = _balance[msg.sender];
-        if (userBal.freezeStart != 0) {
-            require(
-                userBal.freezeStart + MAX_FREEZE < block.timestamp,
-                "frozen"
-            );
-        }
         // should stake for at least an year before you can freeze
         // DISCUSS: I know we have a potential situation here
         // 1. User deposits 10 $EASE and waits for more than a year
@@ -271,28 +286,15 @@ abstract contract StakingContract is IStakingContract {
         // The question is how will the user get benefit from that?
         // Can we say that the user can use this potential issue and exploit us?
         // Or there's no issue that can cause?
+        // Sould freeze start be set to 0 if the user does that? I think I should add
+        // that logic to deposit()
+
+        //TODO: figure out what other checks we need so that users cannot exploit this
         require(
             (uint64(block.timestamp) - userBal.depositStart) >= MAX_GROW,
             "stake threshold not met"
         );
-        // TODO: NORMALIZE FREEZE START
-        // TODO: write helper function for normalization for
-        // both deposit and freeze
-        if (
-            userBal.freezeStart == 0 ||
-            (userBal.freezeStart + (2 * MAX_FREEZE)) > block.timestamp
-        ) {
-            userBal.freezeStart = timeStamp64();
-        } else {
-            // normalize time
-            // TODO: come back and fix me later
-            // the reason I am not able to come up with a quick solution here
-            // is because what if the user calls freeze() and waits for MAX_FREEZE
-            // and call freeze again? I think there should not be time limit as
-            // MAX_FREEZE? as user's power can increase upto 200% and never beyond
-            // that? there's a room for discussion here
-            userBal.freezeStart = timeStamp64();
-        }
+        userBal.freezeStart = timeStamp64();
 
         _balance[msg.sender] = userBal;
     }
@@ -300,22 +302,23 @@ abstract contract StakingContract is IStakingContract {
     /*//////////////////////////////////////////////////////////////
                             BRIBE LOGIC
     //////////////////////////////////////////////////////////////*/
-    function bribe(uint256 _payAmount, address _vault) external {
+    function bribe(uint256 payAmount, address vault) external {
         // QUESTION: I think we should pass in amount of power they want to bribe,
         //  time period in months and vaultaddress that way we can make things simpler
 
         // TODO: should this function call update the expired bribes?
+
+        //TODO: a function _updateBribe();that will update total bribed variable?
         // depending on their time for example let's say user has bribed gvEASE
         // for 2 months and it has expired that means the amount of gvEASE bribed
         // then should be up for sale again.
 
         // calculate gvPower being bribed against payAmount
         // is it true that power can be bribed for a fixed period of time?
-        uint256 gvPower = (_payAmount * 1000 * 10**decimals) /
-            bribeDetails.cost;
-        uint256 noOfWeeks = _payAmount / bribeDetails.cost; // expiry in weeks
+        uint256 gvPower = (payAmount * 1000 * 10**decimals) / bribeDetails.cost;
+        uint256 noOfWeeks = payAmount / bribeDetails.cost; // expiry in weeks
         // gvPower being bribed should not be more than the amount of power that is for sale
-        uint256 powerForSale = _balanceOf(_balance[address(0)]) -
+        uint256 powerForSale = _power(_balance[address(0)]) -
             bribeDetails.totalBribed;
         require(powerForSale >= gvPower, "sale amount < bribe amount");
         // add that power to the vault of choice
@@ -331,79 +334,101 @@ abstract contract StakingContract is IStakingContract {
         bribeDetails.totalBribed += gvPower;
         // TODO: add something to monthly payouts?
 
-        emit Bribe(_vault, gvPower, noOfWeeks * 1 weeks);
+        emit Bribe(vault, gvPower, noOfWeeks * 1 weeks);
     }
 
     /*///////////////////////////////////////////////////////////////
                         ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
     /// @dev calcuates gvEASE balance of a user
-    function _balanceOf(Balance memory userBalance)
+    function _power(Balance memory userBal) private view returns (uint256) {
+        return uint256(userBal.amount) + _getExtraPower(userBal);
+    }
+
+    /// @dev Calculates extra power boost of a user
+    /// frozen growth and staking growth
+    function _getExtraPower(Balance memory userBal)
         private
         view
-        returns (uint256)
+        returns (uint128)
     {
-        uint64 currentTime = timeStamp64();
-        // multiplying factor for normal growth upto max growth time
-        uint256 multiplyingFactor = ((currentTime - userBalance.depositStart) *
-            BUFFER) / MAX_GROW;
-        // TODO: refactor increase amount for normal growth and freeze
-        // which can be identical just the change being MAX_GROW and MAX_FREEZE
-        uint256 increaseAmount;
-        if (multiplyingFactor > MAX_GROW * BUFFER) {
-            if (multiplyingFactor < 2 * MAX_GROW * BUFFER) {
-                increaseAmount =
-                    (userBalance.amount *
-                        (MAX_GROW * BUFFER * 2 - multiplyingFactor)) /
-                    BUFFER;
+        bool frozen = userBal.freezeStart > userBal.depositStart;
+        // CONDITIONS
+        uint64 timeStamp = timeStamp64();
+        if (frozen) {
+            // frozenTime
+            uint256 fTime = timeStamp - userBal.freezeStart;
+            // decay time
+            uint64 dTime = userBal.freezeStart -
+                userBal.depositStart -
+                MAX_GROW;
+            // if frozenTime >= decayTime max power has achieved
+            if (fTime >= dTime) {
+                return userBal.amount;
+            } else {
+                // this means we are in a growth phase
+                // calculate extraPower at freeze time
+
+                // grow time
+                uint256 gTime = MAX_GROW - dTime;
+                // extra power growth at freeze time
+                uint256 gPower = (uint256(userBal.amount) * (gTime)) / MAX_GROW;
+                // calculate extraPower gained after freezing
+                uint256 fPower = (uint256(userBal.amount) *
+                    timeStamp -
+                    userBal.freezeStart) / MAX_GROW;
+                return uint128(fPower + gPower);
             }
         } else {
-            increaseAmount = (userBalance.amount * multiplyingFactor) / BUFFER;
-        }
-        // Handle Freeze
-        // update multiplying factor for FROZEN accounts
-        multiplyingFactor =
-            ((currentTime - userBalance.freezeStart) * BUFFER) /
-            MAX_FREEZE;
-        if (multiplyingFactor > MAX_FREEZE * BUFFER) {
-            // does this mean that the power has started decreasing?
-            if (multiplyingFactor < 2 * MAX_FREEZE * BUFFER) {
-                increaseAmount +=
-                    (userBalance.amount *
-                        (MAX_FREEZE * BUFFER * 2 - multiplyingFactor)) /
-                    BUFFER;
+            uint256 multiplyingFactor = ((timeStamp64() -
+                userBal.depositStart) * BUFFER) / MAX_GROW;
+
+            // if power slope is in a decaying phase
+            if (multiplyingFactor > MAX_GROW * BUFFER) {
+                if (multiplyingFactor < 2 * MAX_GROW * BUFFER) {
+                    return
+                        uint128(
+                            (uint256(userBal.amount) *
+                                (MAX_GROW * BUFFER * 2 - multiplyingFactor)) /
+                                BUFFER
+                        );
+                }
+            } else {
+                // if power slope is in a growing phase
+                return
+                    uint128(
+                        (uint256(userBal.amount) * multiplyingFactor) / BUFFER
+                    );
             }
-        } else {
-            increaseAmount += (userBalance.amount * multiplyingFactor) / BUFFER;
         }
-        return uint256(userBalance.amount) + increaseAmount;
+        return 0;
     }
 
     /*//////////////////////////////////////////////////////////////
                            ONLY DAO
     //////////////////////////////////////////////////////////////*/
-    function setPower(bytes32 _newPower) external onlyGov {
-        _powerRoot = _newPower;
+    function setPower(bytes32 newPower) external onlyGov {
+        _powerRoot = newPower;
     }
 
-    function adjustBribeCost(uint256 _newCost) external onlyGov {
+    function adjustBribeCost(uint256 newCost) external onlyGov {
         // TODO: QUESTION:  do we need some require here so that bribe cost is not off?
         // may be min bribe cost? incase if gov is compromised?
         // I don't know need to discuss
-        bribeDetails.cost = _newCost;
+        bribeDetails.cost = newCost;
     }
 
     /*//////////////////////////////////////////////////////////////
                           VIEWS
     //////////////////////////////////////////////////////////////*/
-    function balance(address _user) external view returns (uint256) {
-        Balance memory userBal = _balance[_user];
+    function balance(address user) external view returns (uint256) {
+        Balance memory userBal = _balance[user];
         return userBal.amount + _getReward(userBal);
     }
 
-    function power(address _user) external view returns (uint256) {
-        Balance memory userBal = _balance[_user];
-        return _balanceOf(userBal);
+    function power(address user) external view returns (uint256) {
+        Balance memory userBal = _balance[user];
+        return _power(userBal);
     }
 
     function bribeCost() external view returns (uint256) {
@@ -413,15 +438,11 @@ abstract contract StakingContract is IStakingContract {
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    function _getReward(Balance memory _userBal)
-        private
-        view
-        returns (uint256)
-    {
+    function _getReward(Balance memory userBal) private view returns (uint256) {
         // TODO: as we have not discussed more about what should be the
         // reward hardcoding 10% for now
         // How to calculate user's reward amount at any point?
-        return _userBal.amount / 10;
+        return userBal.amount / 10;
     }
 
     /*//////////////////////////////////////////////////////////////
