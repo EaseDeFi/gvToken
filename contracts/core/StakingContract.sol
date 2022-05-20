@@ -44,9 +44,11 @@ abstract contract StakingContract is IStakingContract {
                             CONSTANTS
     //////////////////////////////////////////////////////////////*/
     uint256 private constant BUFFER = 10**18;
-    uint64 private constant MAX_GROW = 52 weeks;
+    uint32 private constant MAX_GROW = 52 weeks;
+    uint32 private constant WITHDRAWAL_DELAY = 4 weeks;
     /// @notice max percentage
     uint128 private constant DENOMINATOR = 10000;
+    uint32 private constant SLASH_PERCENT = 2000;
 
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLE STATE
@@ -68,8 +70,17 @@ abstract contract StakingContract is IStakingContract {
 
     // userAddress => balanceDetails
     mapping(address => Balance) private _balance;
+    // TODO: figure out a way to generalize _totalStaked and _userStake
+    // as i am storing %Staked twice as I need to know total % staked of
+    // a user which is impossible to do with _userStakes
     // user => total % staked
-    mapping(address => uint256) private _userStakes;
+    mapping(address => uint256) private _totalStaked;
+    // user => rca-vault => %Staked
+    mapping(address => mapping(address => uint256)) private _userStakes;
+
+    // user => WithdrawRequest
+    mapping(address => WithdrawRequest) public withdrawRequests;
+    uint256 public pendingWithdrawal;
 
     // cost in $EASE per 1000 gvEASE
     // QUESTION: tbh shouldn't bribe cost be dynamic?
@@ -77,6 +88,8 @@ abstract contract StakingContract is IStakingContract {
     // think out loud. If you are gonna ask me how I don't know
     // solution yet lol.
     BribeDetails private bribeDetails;
+
+    RewardPool private rewardPool;
 
     bytes32 private _powerRoot;
 
@@ -145,8 +158,6 @@ abstract contract StakingContract is IStakingContract {
                     (uint256(userBal.amount) + amount)
             );
         }
-        // TODO: what happens if user has freezed their balance and try to add
-        // more ease tokens to the contract? figure this out
         if (
             userBal.freezeStart != 0 &&
             ((timeStamp64() - userBal.depositStart) < MAX_GROW)
@@ -159,6 +170,8 @@ abstract contract StakingContract is IStakingContract {
             // to save gas? because if I set to 0 and reset it to freezeStart later
             // I will have to pay gas to write to a totally new storage
             userBal.freezeStart = 0;
+            // TODO: emit freeze here? There may be a need to know this for the
+            // off chain world. Resolve this later
         }
         // update balance
         userBal.amount += amount;
@@ -167,12 +180,11 @@ abstract contract StakingContract is IStakingContract {
         // is stored in % it's hard to calculate total staked % I think
         // I may need a staked variable where I can store % staked of the user? *SOLVED*
 
-        // update address(0) balance that we use to store amount
-        // for bribing
+        // update address(0) balance that we use to store amount for bribing
         Balance memory forSaleBal = _balance[address(0)];
         // amount to increase for sale
         uint256 saleAmount;
-        uint256 stakePercent = _userStakes[msg.sender];
+        uint256 stakePercent = _totalStaked[msg.sender];
         if (stakePercent == 0) {
             saleAmount = amount;
         } else {
@@ -202,12 +214,32 @@ abstract contract StakingContract is IStakingContract {
 
     function withdraw(uint128 amount) external {
         // Withdraw if not frozen
+        // TODO: should I care about updating userStakes? only necessary
+        // if we are doing something with our Staked event off chain.
+        // else it doesn't matter. But the concern is let's say user
+        // has staked in multiple rcas they withdraw their whole staking
+        // balance and we don't update the staked amount %s. As a protocol
+        // there's no problem for us, but the problem can be if user deposits
+        // again in the future and the staked amounts to rca-vaults are pre
+        // assigned
         address user = msg.sender;
         Balance memory userBal = _balance[user];
         Balance memory forSaleBal = _balance[address(0)];
+        bool frozen = userBal.freezeStart != 0;
+        uint128 slashAmount;
+        if (frozen) {
+            // User willing to get slashed on withdrawal
+            // slash 20%
+            slashAmount = uint128((amount * SLASH_PERCENT) / DENOMINATOR);
 
-        require(userBal.freezeStart != 0, "account frozen");
-        uint256 userStake = _userStakes[user];
+            // TODO: if we want to make slash dynamic the more power you have
+            // the more you get slashed
+            // slashAmount += slashAmount * (user power/withdraw amount)
+
+            rewardPool.frozen += slashAmount;
+        }
+
+        uint256 userStake = _totalStaked[user];
         // amount to deduct from sale
         uint256 deductForSale = (amount * (DENOMINATOR - userStake)) /
             DENOMINATOR;
@@ -236,9 +268,33 @@ abstract contract StakingContract is IStakingContract {
         _balance[address(0)] = forSaleBal;
 
         // transfer to the user
-        token.safeTransfer(user, amount);
+        token.safeTransfer(user, amount - slashAmount);
 
         emit Withdraw(user, amount);
+    }
+
+    function withdrawRequest(uint256 amount) external {
+        // deduct users balance
+        Balance memory userBal = _balance[msg.sender];
+        WithdrawRequest memory currReq = withdrawRequests[msg.sender];
+
+        // TODO: should i care about normalizing time here to make it fair to
+        // the user?
+        uint64 endTime = timeStamp64() + WITHDRAWAL_DELAY;
+        // (uint(amount) * endTime) + (currReq.amount * currReq.endTime) /
+        currReq.endTime = uint64(
+            ((amount * endTime) + (uint256(currReq.amount * currReq.endTime))) /
+                (amount + currReq.amount)
+        );
+        uint128 rewardAmount = _getReward(userBal);
+        currReq.amount += (uint128(amount) + rewardAmount);
+        // calculate user's reward?
+        // update user's withdraw
+        withdrawRequests[msg.sender] = currReq;
+    }
+
+    function withdrawFinalize() external {
+        // Finalize withdraw of a user
     }
 
     function stake(uint256 balancePercent, address vault) external {
@@ -251,19 +307,23 @@ abstract contract StakingContract is IStakingContract {
         // ANS: will it result in increase in %staked to a specific rca-vault?
         address user = msg.sender;
         // TODO: increase % staked amount of vault
-        uint256 userStake = _userStakes[user];
+        uint256 userStake = _totalStaked[user];
         userStake += balancePercent;
         require(userStake < DENOMINATOR, "can't stake more than 100%");
         // update user staked %
-        _userStakes[user] = userStake;
+        _totalStaked[user] = userStake;
 
+        _userStakes[msg.sender][vault] += balancePercent;
         // update amount for bribe
         uint256 amount = (uint256(_balance[user].amount) * balancePercent) /
             DENOMINATOR;
-        _balance[address(0)].amount -= uint128(amount);
+        Balance memory forSaleBal = _balance[address(0)];
+        forSaleBal.amount -= uint128(amount);
 
         // TODO: decrease amountForBribe balance (address(0)) balance
         // thoughts on achieving above. Renormalize the startTime of address(0)
+
+        _balance[address(0)] = forSaleBal;
 
         emit Stake(user, vault, balancePercent);
     }
@@ -271,7 +331,24 @@ abstract contract StakingContract is IStakingContract {
     // TODO: QUESTION: Do we need this function?
     function unStake(uint256 balancePercent, address vault) external {
         // Unstake from a rca-vault
+        address user = msg.sender;
+        _userStakes[user][vault] -= balancePercent;
+        _totalStaked[user] -= balancePercent;
+
         // keep power up for sale
+        Balance memory userBal = _balance[user];
+        Balance memory forSaleBal = _balance[address(0)];
+        uint256 amount = (uint256(_balance[user].amount) * balancePercent) /
+            DENOMINATOR;
+        // should I care about normalizing time? probably yes
+        forSaleBal.depositStart = uint64(
+            ((uint256(forSaleBal.amount) * uint256(forSaleBal.depositStart)) +
+                ((amount) * uint256(userBal.depositStart))) /
+                (uint256(forSaleBal.amount) + amount)
+        );
+        forSaleBal.amount += uint128(amount);
+
+        _balance[address(0)] = forSaleBal;
     }
 
     function freeze() external {
@@ -345,15 +422,14 @@ abstract contract StakingContract is IStakingContract {
         return uint256(userBal.amount) + _getExtraPower(userBal);
     }
 
-    /// @dev Calculates extra power boost of a user
-    /// frozen growth and staking growth
+    /// @dev Calculates extra power boost of a user frozen growth,
+    /// and staking growth
     function _getExtraPower(Balance memory userBal)
         private
         view
         returns (uint128)
     {
         bool frozen = userBal.freezeStart > userBal.depositStart;
-        // CONDITIONS
         uint64 timeStamp = timeStamp64();
         if (frozen) {
             // frozenTime
@@ -363,7 +439,7 @@ abstract contract StakingContract is IStakingContract {
                 userBal.depositStart -
                 MAX_GROW;
             // if frozenTime >= decayTime max power has achieved
-            if (fTime >= dTime) {
+            if (fTime >= dTime || fTime >= MAX_GROW) {
                 return userBal.amount;
             } else {
                 // this means we are in a growth phase
@@ -438,10 +514,14 @@ abstract contract StakingContract is IStakingContract {
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    function _getReward(Balance memory userBal) private view returns (uint256) {
+    function _getReward(Balance memory userBal) private view returns (uint128) {
         // TODO: as we have not discussed more about what should be the
         // reward hardcoding 10% for now
         // How to calculate user's reward amount at any point?
+
+        // TODO: calculate frozen reward (slashed from emergency withdrawals)
+
+        // TODO: calculate staking reward
         return userBal.amount / 10;
     }
 
@@ -458,11 +538,22 @@ abstract contract StakingContract is IStakingContract {
 // calculating amount staked in each rca-vault offline. One is when
 // the user stakes, and the other is when someone bribes gvEASE.
 
-// POETNTIAL ISSUE
-// let's say all amount that has ever been staked has been bribed
-// In case like this we should not allow user to withdraw right?
-// I should look deep into this later and fix it
+// POETNTIAL ISSUES
+/*  1. let's say all amount that has ever been staked has been bribed
+    In case like this we should not allow user to withdraw right?
+    I should look deep into this later and fix it
+*/
 
+/*
+   2: should I care about updating userStakes? only necessary
+   if we are doing something with our Staked event off chain.
+   else it doesn't matter. But the concern is let's say user
+   has staked in multiple rcas they withdraw their whole staking
+   balance and we don't update the staked amount %s. As a protocol
+   there's no problem for us, but the problem can be if user deposits
+   again in the future and the staked amounts to rca-vaults are pre
+   assigned
+*/
 // QUESTION:
 // 1. how to calculate total $gvEASE inside the contract?
 // Do we need that at all? with the current contract structure it will

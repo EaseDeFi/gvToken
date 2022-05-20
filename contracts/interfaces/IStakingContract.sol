@@ -124,4 +124,15 @@ interface IStakingContract {
         uint256 totalBribed; // total bribed $gvEASE from the protocol
         uint256 pendingRewards; // pending rewards to distribute against bribing
     }
+
+    // TODO: create a reward struct
+    struct RewardPool {
+        uint128 frozen;
+        uint128 staked;
+    }
+
+    struct WithdrawRequest {
+        uint128 amount;
+        uint64 endTime;
+    }
 }
