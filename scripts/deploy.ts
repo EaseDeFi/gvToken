@@ -1,25 +1,58 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// When running the script with `npx hardhat run <script>` you'll find the Hardhat
-// Runtime Environment's members available in the global scope.
+import "@nomiclabs/hardhat-ethers";
+import { getContractAddress } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 
+import {
+  EaseToken,
+  EaseToken__factory,
+  IERC20,
+  TokenSwap,
+  TokenSwap__factory,
+} from "../src/types";
+import { MAINNET_ADDRESSES } from "../test/constants";
+import { Contracts, Signers } from "../test/types";
+
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+  const signers = {} as Signers;
+  const contracts = {} as Contracts;
 
-  // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
+  const EASE_TOKEN_FACTORY = <EaseToken__factory>(
+    await ethers.getContractFactory("EaseToken")
+  );
+  const TOKEN_SWAP_FACTORY = <TokenSwap__factory>(
+    await ethers.getContractFactory("TokenSwap")
+  );
 
-  await greeter.deployed();
+  contracts.armorToken = <IERC20>(
+    await ethers.getContractAt("IERC20", MAINNET_ADDRESSES.armorToken)
+  );
 
-  console.log("Greeter deployed to:", greeter.address);
+  const nonce = await signers.user.getTransactionCount();
+  const tokenSwapAddress = getContractAddress({
+    from: signers.user.address,
+    nonce,
+  });
+  const easeTokenAddress = getContractAddress({
+    from: signers.user.address,
+    nonce: nonce + 1,
+  });
+
+  // deploy tokenswap contract
+  contracts.tokenSwap = <TokenSwap>(
+    await TOKEN_SWAP_FACTORY.connect(signers.user).deploy(
+      easeTokenAddress,
+      contracts.armorToken.address
+    )
+  );
+  await contracts.tokenSwap.deployed();
+  console.log(`TokenSwap deployed at ${contracts.tokenSwap.address}`);
+
+  // deploy ease token
+  contracts.easeToken = <EaseToken>(
+    await EASE_TOKEN_FACTORY.connect(signers.user).deploy(tokenSwapAddress)
+  );
+  await contracts.easeToken.deployed();
+  console.log(`Ease Token deployed at ${contracts.easeToken.address}`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
