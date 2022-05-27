@@ -34,17 +34,23 @@ interface IStakingContractV1 {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
+
     /**
      * @dev Emitted when the user deposits $EASE token to our
      * Staking Contract
      */
-
     event Deposit(address indexed user, uint256 amount);
+
     /**
      * @dev Emitted when the user withdraws $EASE token from our
      * Staking Contract
      */
+    event Withdraw(address indexed user, uint256 amount);
 
+    /**
+     * @dev Emitted when the user withdraws $EASE token from our
+     * Staking Contract
+     */
     event Stake(
         address indexed user,
         address indexed vault,
@@ -85,7 +91,8 @@ interface IStakingContractV1 {
     // need inspection if this will not cause any problem
     struct Balance {
         uint128 amount;
-        uint32 depositStart;
+        uint16 startWeek;
+        uint32 startTime;
     }
 
     struct BribeDetail {
@@ -102,5 +109,10 @@ interface IStakingContractV1 {
     struct BribeExpiry {
         uint112 bribeRate;
         uint112 totalBribe;
+    }
+
+    struct WithdrawRequest {
+        uint128 amount;
+        uint64 endTime;
     }
 }
