@@ -31,6 +31,18 @@ interface IStakingContractV1 {
         uint256 period
     ) external;
 
+    /// @dev returns weighted $gvEASE balance of the user (aka voting power)
+    /// @param _user address of a user
+    function power(address _user) external view returns (uint256);
+
+    /// @dev set's merkle root of vArmor stakers which will be used
+    /// to give initial $gvEASE boost to the vArmor holders
+    /// @param _root merkle root of vArmor stakers
+    // TODO: need more clarifaction on this should setPower be a function at all?
+    //  can't we set it as immutable variable if it is just used for vArmor holders?
+    // or do we have anything to do with this in the future?
+    function setPower(bytes32 _root) external;
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -91,19 +103,14 @@ interface IStakingContractV1 {
     // need inspection if this will not cause any problem
     struct Balance {
         uint128 amount;
-        uint16 startWeek;
-        uint32 startTime;
+        uint32 depositStart;
+        uint32 rewardStart;
     }
 
     struct BribeDetail {
         uint16 startWeek;
         uint16 endWeek;
         uint112 ratePerWeek; // Amount paid in ease tokens per week
-    }
-
-    struct RewardPot {
-        uint128 slashed;
-        uint128 bribed;
     }
 
     struct BribeExpiry {
@@ -113,6 +120,6 @@ interface IStakingContractV1 {
 
     struct WithdrawRequest {
         uint128 amount;
-        uint64 endTime;
+        uint32 endTime;
     }
 }

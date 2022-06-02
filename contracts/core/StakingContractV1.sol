@@ -16,13 +16,13 @@ import "../interfaces/IEaseToken.sol";
  * @notice Contract for ease tokenomics.
  * @author Ease
  **/
-abstract contract StakingContractV1 is IStakingContractV1 {
+abstract contract StakingContract is IStakingContractV1 {
     using SafeERC20 for IEaseToken;
     /*//////////////////////////////////////////////////////////////
                             CONSTANTS
     //////////////////////////////////////////////////////////////*/
     uint256 internal constant BUFFER = 10**18;
-    uint256 internal constant MAX_GROW = 52; // in weeks
+    uint256 internal constant MAX_GROW = 52 weeks;
     uint256 internal constant DELAY = 4 weeks;
     uint256 internal constant WEEK = 1 weeks;
 
@@ -61,7 +61,7 @@ abstract contract StakingContractV1 is IStakingContractV1 {
     uint256 internal bribeRate;
 
     // bribe to expire next (store week from genesis)
-    uint256 internal nextExpiry;
+    uint256 internal lastExpiry;
 
     // user => total % staked
     mapping(address => uint256) private _totalStaked;
@@ -133,22 +133,29 @@ abstract contract StakingContractV1 is IStakingContractV1 {
     ) private {
         Balance memory userBal = _balance[user];
 
-        uint256 currWeek = getCurrWeek(currTime);
-        userBal.startWeek = uint16(
-            (amount * currWeek + userBal.amount * userBal.startWeek) /
-                (amount + userBal.amount)
+        userBal.depositStart = _normalizeTimeForward(
+            userBal.amount,
+            userBal.depositStart,
+            amount,
+            currTime
         );
-
+        userBal.rewardStart = userBal.depositStart;
         userBal.amount = uint112(amount);
 
         Balance memory venalPotBal = _balance[address(0)];
 
         venalPotBal.amount += uint112(amount);
-        venalPotBal.startWeek = uint16(
-            (amount * currWeek + venalPotBal.amount * venalPotBal.startWeek) /
+        venalPotBal.depositStart = uint32(
+            ((amount * currTime) +
+                (venalPotBal.amount * venalPotBal.depositStart)) /
                 (amount + venalPotBal.amount)
         );
-
+        venalPotBal.depositStart = _normalizeTimeForward(
+            venalPotBal.amount,
+            venalPotBal.depositStart,
+            amount,
+            currTime
+        );
         token.transferFrom(user, address(this), amount);
         // Update user balance
         _balance[user] = userBal;
@@ -160,12 +167,13 @@ abstract contract StakingContractV1 is IStakingContractV1 {
                         WITHDRAW IMPL
     //////////////////////////////////////////////////////////////*/
     function withdraw(uint256 amount) external {
+        // THINK MORE
         // Add rewards wrt amount being withdrawn
         address user = msg.sender;
         Balance memory userBal = _balance[user];
         Balance memory venalPotBal = _balance[address(0)];
         uint256 currWeek = getCurrWeek(block.timestamp);
-        bool frozen = currWeek - userBal.startWeek > MAX_GROW;
+        bool frozen = currWeek - userBal.depositStart > MAX_GROW;
         uint256 slashAmount;
         if (frozen) {
             // TODO: Implement dynamic slashing
@@ -186,9 +194,10 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         uint256 rewardAmount = _getReward(userBal);
 
         // Normalize venal pot start time
-        venalPotBal.startWeek = uint16(
-            ((venalPotBal.amount * venalPotBal.startWeek) -
-                (amount * userBal.startWeek)) / (venalPotBal.amount - amount)
+        // TODO: (Verify this assmuption while testing)
+        venalPotBal.depositStart = uint32(
+            ((venalPotBal.amount * venalPotBal.depositStart) -
+                (amount * userBal.depositStart)) / (venalPotBal.amount - amount)
         );
 
         venalPotBal.amount -= uint112(deductForVPot);
@@ -222,9 +231,11 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         // the user?
         uint256 endTime = block.timestamp + DELAY;
         // (uint(amount) * endTime) + (currReq.amount * currReq.endTime) /
-        currReq.endTime = uint64(
-            ((amount * endTime) + (uint256(currReq.amount * currReq.endTime))) /
-                (amount + currReq.amount)
+        currReq.endTime = _normalizeTimeForward(
+            amount,
+            endTime,
+            currReq.amount,
+            currReq.endTime
         );
         uint128 rewardAmount = _getReward(userBal);
         currReq.amount += (uint128(amount) + rewardAmount);
@@ -270,6 +281,8 @@ abstract contract StakingContractV1 is IStakingContractV1 {
 
         // 2.update the venal pot
 
+        // 3. update users'bal
+
         address user = msg.sender;
         // TODO: increase % staked amount of vault
         uint256 userStake = _totalStaked[user];
@@ -287,14 +300,29 @@ abstract contract StakingContractV1 is IStakingContractV1 {
 
         venalPotBal.amount -= uint128(amount);
 
-        // normalize startweek for bribebal
-        venalPotBal.startWeek = uint16(
-            ((venalPotBal.amount * venalPotBal.startWeek) -
-                (amount * userBal.startWeek)) / (venalPotBal.amount - amount)
+        // normalize depositStart for bribebal
+        venalPotBal.depositStart = uint32(
+            ((venalPotBal.amount * venalPotBal.depositStart) -
+                (amount * userBal.depositStart)) / (venalPotBal.amount - amount)
         );
-
+        venalPotBal.depositStart = _normalizeTimeBackward(
+            venalPotBal.amount,
+            venalPotBal.depositStart,
+            amount,
+            userBal.depositStart
+        );
         _balance[address(0)] = venalPotBal;
 
+        uint256 userEaseBal = userBal.amount;
+        // reward whatever is owed to the user for the %balance
+        // so that we don't run into complications on bribe and slashed
+        // rewards
+        userBal.amount = uint128(amount);
+        uint256 rewardAmt = _getReward(userBal);
+        userBal.amount = uint128(rewardAmt + userEaseBal);
+        // is there a need to account total claimed rewards?
+        rewardPot -= rewardAmt;
+        _balance[user] = userBal;
         emit Stake(user, vault, balancePercent);
     }
 
@@ -307,24 +335,42 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         // Should update venal pot balance
 
         address user = msg.sender;
-        _userStakes[vault][user] -= balancePercent;
-        _totalStaked[user] -= balancePercent;
-
         // keep power up for sale
         Balance memory userBal = _balance[user];
         Balance memory venalPotBal = _balance[address(0)];
         uint256 amount = (uint256(_balance[user].amount) * balancePercent) /
             DENOMINATOR;
         // should I care about normalizing time? probably yes
-        venalPotBal.startWeek = uint16(
+        venalPotBal.depositStart = uint32(
             (amount *
-                userBal.startWeek +
+                userBal.depositStart +
                 venalPotBal.amount *
-                venalPotBal.startWeek) / (amount + venalPotBal.amount)
+                venalPotBal.depositStart) / (amount + venalPotBal.amount)
         );
         venalPotBal.amount += uint128(amount);
 
         _balance[address(0)] = venalPotBal;
+        // reward user for their unstaked balance to remove complexity
+        // on distributing rewards
+
+        uint256 rewardFor = userBal.amount -
+            ((uint256(userBal.amount) * _totalStaked[user]) / DENOMINATOR);
+
+        // backup
+        uint256 userEaseBal = userBal.amount;
+        // updating amount for getting reward owed for
+        // the unstaked amount of the user so that we are in
+        // sync with rewards calculation
+        userBal.amount = uint128(rewardFor);
+        uint256 rewardAmt = _getReward(userBal);
+        userBal.amount = uint128(userEaseBal + rewardAmt);
+        userBal.rewardStart = timeStamp32();
+        // update reward pot
+        rewardPot -= rewardAmt;
+
+        _userStakes[vault][user] -= balancePercent;
+        _totalStaked[user] -= balancePercent;
+
         emit UnStake(user, vault, balancePercent);
     }
 
@@ -340,11 +386,6 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         uint256 numOfWeeks = (expiry - block.timestamp) / WEEK;
         uint256 startWeek = (timeStamp32() - genesis / WEEK) + 1;
         uint256 endWeek = startWeek + numOfWeeks;
-
-        if (endWeek < nextExpiry || nextExpiry == 0) {
-            // update upcoming expiry
-            nextExpiry = endWeek;
-        }
 
         // TODO: check if bribe already exists
 
@@ -399,19 +440,27 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         // TODO: emit cancle bribe event
     }
 
-    function expireBribe() external {
-        _expireBribe(nextExpiry);
-        // TODO: update next expiry
-        // how can I achieve this?
-        // nextExpiry = updated week
+    function expireBribe(uint256 week) external {
+        _expireBribe(week);
+        lastExpiry = week;
     }
 
-    function _expireBribe(uint256 weekNumber) internal {
+    function expireBribes(uint256 curWeek) internal {
+        uint256 bribeWeek = lastExpiry + 1;
+
+        while (curWeek > bribeWeek) {
+            _expireBribe(bribeWeek++);
+        }
+        // update last expiry
+        lastExpiry = bribeWeek;
+    }
+
+    function _expireBribe(uint256 week) internal {
         uint256 curWeek = getCurrWeek(timeStamp32());
 
-        require(weekNumber >= curWeek, "not expired");
+        require(week >= curWeek, "not expired");
 
-        BribeExpiry memory bribeExpiry = bribeToExpire[weekNumber];
+        BribeExpiry memory bribeExpiry = bribeToExpire[week];
 
         // update bribe rate
         bribeRate -= bribeExpiry.bribeRate;
@@ -419,15 +468,15 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         // add expired bribes amount to reward pot
         rewardPot += bribeExpiry.totalBribe;
 
+        lastExpiry = week;
         // we no longer need it
-        delete bribeToExpire[weekNumber];
-
-        // TODO: emit bribe expired event
+        delete bribeToExpire[week];
     }
 
     /*///////////////////////////////////////////////////////////////
                         ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
+
     /// @dev calcuates gvEASE balance of a user
     function _power(Balance memory userBal) private view returns (uint256) {
         // update user balance with rewards owed
@@ -443,12 +492,12 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         view
         returns (uint128)
     {
-        uint256 currWeek = getCurrWeek(block.timestamp);
-        if ((userBal.startWeek + MAX_GROW) <= currWeek) {
+        uint256 currTime = timeStamp32();
+        if ((userBal.depositStart + MAX_GROW) <= currTime) {
             // meaining the time has passed max grow
             return userBal.amount;
         } else {
-            uint256 multFactor = (currWeek - (userBal.startWeek * BUFFER)) /
+            uint256 multFactor = (currTime - (userBal.depositStart * BUFFER)) /
                 MAX_GROW;
             return uint128((userBal.amount * multFactor) / BUFFER);
         }
@@ -458,39 +507,44 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         //NOTE: user will only get rewards if an only if user has _extraPower
 
         Balance memory venalPotBal = _balance[address(0)];
-        uint256 currWeek = getCurrWeek(block.timestamp);
+        uint256 currTime = timeStamp32();
         // venal pot's extra power
         uint256 extPowV = _getExtraPower(venalPotBal);
-        // user's extra power
+        // user's extra power current time
         uint256 extPowU = _getExtraPower(userBal);
-        // week since start for venal pot
-        uint256 weekSinceV = currWeek - venalPotBal.startWeek;
-        // week since start for user bal
-        uint256 weekSinceU = currWeek - userBal.startWeek;
+
+        // user's extra power at last reward time
+        userBal.depositStart = userBal.rewardStart;
+        uint256 powAtLastReward = _getExtraPower(userBal);
+
+        // time since start for venal pot
+        uint256 timeSinceV = currTime - venalPotBal.depositStart;
+        // time since reward start for the user
+        uint256 timeSinceU = currTime - userBal.rewardStart;
 
         // area covered by venal pot's power graph
         // venal pot area
         uint256 vArea;
-        if (weekSinceV < MAX_GROW) {
+        if (timeSinceV < MAX_GROW) {
             // only need to calculate triangular area
-            vArea = (weekSinceV * extPowV) / 2;
+            vArea = (timeSinceV * extPowV) / 2;
         } else {
             // triangular area
             vArea = (MAX_GROW * extPowV) / 2;
             // rectangular area
-            vArea += (weekSinceV - MAX_GROW) * extPowV;
+            vArea += (timeSinceV - MAX_GROW) * extPowV;
         }
 
         // area covered by user's power graph
         uint256 uArea;
-        if (weekSinceU < MAX_GROW) {
+        if (timeSinceU < MAX_GROW) {
             // only need to calculate triangular area
-            uArea = (weekSinceU * extPowU) / 2;
+            uArea = (timeSinceU * extPowU) / 2;
         } else {
             // triangular area
             uArea = (MAX_GROW * extPowU) / 2;
             // rectangular area
-            uArea += (weekSinceU - MAX_GROW) * extPowU;
+            uArea += (timeSinceU - MAX_GROW) * extPowU;
         }
         // user share in % of total reward pot
         uint256 userShare = (uArea * BUFFER) / vArea;
@@ -508,6 +562,18 @@ abstract contract StakingContractV1 is IStakingContractV1 {
         _powerRoot = newPower;
     }
 
+    function setMinSlash(uint256 percent) external onlyGov {
+        // TODO: revisit this
+        require(percent < DENOMINATOR, "you can't slash more than 100%");
+        minSlash = percent;
+    }
+
+    function setMaxSlash(uint256 percent) external onlyGov {
+        // TODO: revisit this
+        require(percent < DENOMINATOR, "you can't slash more than 100%");
+        maxSlash = percent;
+    }
+
     /*//////////////////////////////////////////////////////////////
                         UTILITIES
     //////////////////////////////////////////////////////////////*/
@@ -519,8 +585,28 @@ abstract contract StakingContractV1 is IStakingContractV1 {
     function getCurrWeek(uint256 currTime) internal view returns (uint16) {
         return uint16((currTime - genesis) / WEEK);
     }
-}
 
-// Major problem I am running into how to expire bribes effectively what I
-// want to do is keep next expiry variable and delete that bribe and update
-// rewardPot and then update the nextExpiry
+    function _normalizeTimeForward(
+        uint256 oldAmount,
+        uint256 oldTime,
+        uint256 newAmount,
+        uint256 newTime
+    ) internal pure returns (uint32 normalizedTime) {
+        normalizedTime = uint32(
+            ((oldAmount * oldTime) + (newAmount * newTime)) /
+                (oldAmount + newAmount)
+        );
+    }
+
+    function _normalizeTimeBackward(
+        uint256 oldAmount,
+        uint256 oldTime,
+        uint256 newAmount,
+        uint256 newTime
+    ) internal pure returns (uint32 normalizedTime) {
+        normalizedTime = uint32(
+            ((oldAmount * oldTime) - (newAmount * newTime)) /
+                (oldAmount - newAmount)
+        );
+    }
+}
