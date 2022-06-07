@@ -110,12 +110,13 @@ interface IStakingContractV1 {
     struct BribeDetail {
         uint16 startWeek;
         uint16 endWeek;
-        uint112 ratePerWeek; // Amount paid in ease tokens per week
+        bool exists;
+        uint112 rate; // Amount paid in ease tokens per week
     }
 
-    struct BribeExpiry {
-        uint112 bribeRate;
-        uint112 totalBribe;
+    struct BribeRate {
+        uint112 startAmt;
+        uint112 expireAmt;
     }
 
     struct WithdrawRequest {

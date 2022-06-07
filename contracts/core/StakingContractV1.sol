@@ -16,7 +16,7 @@ import "../interfaces/IEaseToken.sol";
  * @notice Contract for ease tokenomics.
  * @author Ease
  **/
-abstract contract StakingContract is IStakingContractV1 {
+abstract contract StakingContractV1 is IStakingContractV1 {
     using SafeERC20 for IEaseToken;
     /*//////////////////////////////////////////////////////////////
                             CONSTANTS
@@ -51,16 +51,19 @@ abstract contract StakingContract is IStakingContractV1 {
     // userAddress => balanceDetails
     mapping(address => Balance) internal _balance;
     // week => amount of ease expiring
-    mapping(uint256 => BribeExpiry) internal bribeToExpire;
+    mapping(uint256 => BribeRate) internal bribeRates;
     // rca-vault => user => BribeDetails
     mapping(address => mapping(address => BribeDetail)) internal bribes;
     // rewards
     uint256 internal rewardPot;
+    // user => rewardPot at the time of redeem
+    // TODO: do I need to store venal pot ease bal at last redeem?
+    mapping(address => uint256) userRewardStartsAt;
 
     // EASE per week for entire venal pot(gvEASE for bribe)
     uint256 internal bribeRate;
 
-    // bribe to expire next (store week from genesis)
+    // last bribe expired (store week from genesis)
     uint256 internal lastExpiry;
 
     // user => total % staked
@@ -102,11 +105,25 @@ abstract contract StakingContract is IStakingContractV1 {
         _;
     }
 
+    modifier update() {
+        uint256 currWeek = getCurrWeek(block.timestamp);
+        if (bribeRate > 0 && lastExpiry + 1 < currWeek) {
+            updateBribe();
+        }
+        _;
+    }
+    modifier reward(address user) {
+        // TODO: Reward the user up until the current reward pot
+
+        userRewardStartsAt[msg.sender] = rewardPot;
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT IMPL
     //////////////////////////////////////////////////////////////*/
 
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount) external update reward(msg.sender) {
         _deposit(amount, block.timestamp, msg.sender);
         emit Deposit(msg.sender, amount);
     }
@@ -116,7 +133,7 @@ abstract contract StakingContract is IStakingContractV1 {
         uint256 amount,
         uint256 timeStart,
         bytes32[] memory proof
-    ) external {
+    ) external update reward(msg.sender) {
         bytes32 leaf = keccak256(
             abi.encodePacked(msg.sender, amount, timeStart)
         );
@@ -166,13 +183,13 @@ abstract contract StakingContract is IStakingContractV1 {
     /*//////////////////////////////////////////////////////////////
                         WITHDRAW IMPL
     //////////////////////////////////////////////////////////////*/
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external update reward(msg.sender) {
         // THINK MORE
         // Add rewards wrt amount being withdrawn
+        uint256 currWeek = getCurrWeek(block.timestamp);
         address user = msg.sender;
         Balance memory userBal = _balance[user];
         Balance memory venalPotBal = _balance[address(0)];
-        uint256 currWeek = getCurrWeek(block.timestamp);
         bool frozen = currWeek - userBal.depositStart > MAX_GROW;
         uint256 slashAmount;
         if (frozen) {
@@ -216,11 +233,16 @@ abstract contract StakingContract is IStakingContractV1 {
         emit Withdraw(user, amount);
     }
 
-    function withdrawRequest(uint256 amount) external {
+    function withdrawRequest(uint256 amount)
+        external
+        update
+        reward(msg.sender)
+    {
         // TODO: disscuss should we allow user to reap rewards until
         // they finalize this request? I think no because as they are
         // telling us they want to leave we should give them what we owe
         // when they are telling that they want to leave
+
         address user = msg.sender;
         Balance memory userBal = _balance[user];
         require(userBal.amount >= amount, "not enough balance");
@@ -273,7 +295,11 @@ abstract contract StakingContract is IStakingContractV1 {
     /*//////////////////////////////////////////////////////////////
                         STAKING IMPL
     //////////////////////////////////////////////////////////////*/
-    function stake(uint256 balancePercent, address vault) external {
+    function stake(uint256 balancePercent, address vault)
+        external
+        update
+        reward(msg.sender)
+    {
         // NOTE: things that should happen in this function call
 
         // 1. reward user for the amount being staked. Aka update user's balance
@@ -326,7 +352,11 @@ abstract contract StakingContract is IStakingContractV1 {
         emit Stake(user, vault, balancePercent);
     }
 
-    function unStake(uint256 balancePercent, address vault) external {
+    function unStake(uint256 balancePercent, address vault)
+        external
+        update
+        reward(msg.sender)
+    {
         // Unstake from a rca-vault
 
         // Should update the ease balance of user by the amount of reward owed
@@ -381,96 +411,75 @@ abstract contract StakingContract is IStakingContractV1 {
     function bribe(
         uint256 bribePerWeek,
         address vault,
-        uint256 expiry // timestamp
+        uint256 numOfWeeks // Total weeks to bribe
     ) external {
-        uint256 numOfWeeks = (expiry - block.timestamp) / WEEK;
         uint256 startWeek = (timeStamp32() - genesis / WEEK) + 1;
         uint256 endWeek = startWeek + numOfWeeks;
 
-        // TODO: check if bribe already exists
+        address briber = msg.sender;
 
-        bribes[vault][msg.sender] = BribeDetail(
+        // check if bribe already exists
+        require(!bribes[vault][briber].exists, "bribe already exists");
+
+        bribes[vault][briber] = BribeDetail(
             uint16(startWeek),
             uint16(endWeek),
+            true,
             uint112(bribePerWeek)
         );
 
         // transfer amount to bribe pot
         uint256 amount = bribePerWeek * numOfWeeks;
-        token.transferFrom(msg.sender, address(this), amount);
+        token.transferFrom(briber, address(this), amount);
 
-        // weekly bribe
-        bribeRate += bribePerWeek;
-
-        BribeExpiry memory bribeExpiry = bribeToExpire[endWeek];
-
-        bribeExpiry.totalBribe += uint112(bribePerWeek * numOfWeeks);
-        bribeExpiry.bribeRate += uint112(bribePerWeek);
-
-        bribeToExpire[endWeek] = bribeExpiry;
+        bribeRates[startWeek].startAmt += uint112(bribePerWeek);
+        bribeRates[endWeek].expireAmt += uint112(bribePerWeek);
 
         // TODO: emit bribe event
     }
 
     function cancelBribe(address vault) external {
         // if bribe seems expensive user can stop streaming
-        BribeDetail memory userBribe = bribes[vault][msg.sender];
+        address briber = msg.sender;
+        BribeDetail memory userBribe = bribes[vault][briber];
+        delete bribes[vault][briber];
         uint256 currWeek = getCurrWeek(timeStamp32());
 
         // refund what ever is owed to the user
+
+        // if bribe has expired already this line will error
         uint256 amountToRefund = (userBribe.endWeek - currWeek) *
-            userBribe.ratePerWeek;
+            userBribe.rate;
 
-        // update our bribe pot?
-        rewardPot +=
-            (userBribe.ratePerWeek *
-                (userBribe.endWeek - userBribe.startWeek)) -
-            uint112(amountToRefund);
+        // remove expire amt from end week
+        bribeRates[userBribe.endWeek].expireAmt -= userBribe.rate;
+        // add expire amt to next week
+        bribeRates[currWeek + 1].expireAmt += userBribe.rate;
 
-        // update bribe to expire
-        BribeExpiry memory bribeExpiry = bribeToExpire[userBribe.endWeek];
-        bribeExpiry.bribeRate -= userBribe.ratePerWeek;
-        bribeExpiry.totalBribe -= (userBribe.ratePerWeek *
-            (userBribe.endWeek - userBribe.startWeek));
-
-        // update bribe rate
-        bribeRate -= userBribe.ratePerWeek;
-
-        token.safeTransfer(msg.sender, amountToRefund);
+        token.safeTransfer(briber, amountToRefund);
         // TODO: emit cancle bribe event
     }
 
-    function expireBribe(uint256 week) external {
-        _expireBribe(week);
-        lastExpiry = week;
-    }
+    function updateBribe() public {
+        // TODO: revisit this while testing
+        uint256 currWeek = getCurrWeek(timeStamp32());
+        uint256 week = lastExpiry + 1;
 
-    function expireBribes(uint256 curWeek) internal {
-        uint256 bribeWeek = lastExpiry + 1;
+        while (currWeek > week) {
+            BribeRate memory rates = bribeRates[week];
+            // add bribe rate to reward pot
+            rewardPot += bribeRate;
 
-        while (curWeek > bribeWeek) {
-            _expireBribe(bribeWeek++);
+            // deduct expired amt form bribe rate
+            bribeRate -= rates.expireAmt;
+            // add new start amt
+            bribeRate += rates.startAmt;
+            delete bribeRates[week];
+            week++;
+            // TODO: emit bribe expired ?
         }
         // update last expiry
-        lastExpiry = bribeWeek;
-    }
-
-    function _expireBribe(uint256 week) internal {
-        uint256 curWeek = getCurrWeek(timeStamp32());
-
-        require(week >= curWeek, "not expired");
-
-        BribeExpiry memory bribeExpiry = bribeToExpire[week];
-
-        // update bribe rate
-        bribeRate -= bribeExpiry.bribeRate;
-
-        // add expired bribes amount to reward pot
-        rewardPot += bribeExpiry.totalBribe;
-
-        lastExpiry = week;
-        // we no longer need it
-        delete bribeToExpire[week];
+        lastExpiry = week - 1;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -482,12 +491,12 @@ abstract contract StakingContract is IStakingContractV1 {
         // update user balance with rewards owed
         userBal.amount += _getReward(userBal);
 
-        return uint256(userBal.amount) + _getExtraPower(userBal);
+        return uint256(userBal.amount) + _powerEarned(userBal);
     }
 
     /// @dev Calculates extra power boost of a user frozen growth,
     /// and staking growth
-    function _getExtraPower(Balance memory userBal)
+    function _powerEarned(Balance memory userBal)
         private
         view
         returns (uint128)
@@ -504,18 +513,16 @@ abstract contract StakingContract is IStakingContractV1 {
     }
 
     function _getReward(Balance memory userBal) private view returns (uint128) {
-        //NOTE: user will only get rewards if an only if user has _extraPower
-
         Balance memory venalPotBal = _balance[address(0)];
         uint256 currTime = timeStamp32();
         // venal pot's extra power
-        uint256 extPowV = _getExtraPower(venalPotBal);
+        uint256 extPowV = _powerEarned(venalPotBal);
         // user's extra power current time
-        uint256 extPowU = _getExtraPower(userBal);
+        uint256 extPowU = _powerEarned(userBal);
 
         // user's extra power at last reward time
         userBal.depositStart = userBal.rewardStart;
-        uint256 powAtLastReward = _getExtraPower(userBal);
+        uint256 powAtLastReward = _powerEarned(userBal);
 
         // time since start for venal pot
         uint256 timeSinceV = currTime - venalPotBal.depositStart;
@@ -534,6 +541,8 @@ abstract contract StakingContract is IStakingContractV1 {
             // rectangular area
             vArea += (timeSinceV - MAX_GROW) * extPowV;
         }
+        // add initial easeDeposit area
+        vArea += timeSinceV * venalPotBal.amount;
 
         // area covered by user's power graph
         uint256 uArea;
@@ -546,6 +555,9 @@ abstract contract StakingContract is IStakingContractV1 {
             // rectangular area
             uArea += (timeSinceU - MAX_GROW) * extPowU;
         }
+        // add initial easeDeposit area
+        uArea += timeSinceU * userBal.amount;
+
         // user share in % of total reward pot
         uint256 userShare = (uArea * BUFFER) / vArea;
 
@@ -553,6 +565,10 @@ abstract contract StakingContract is IStakingContractV1 {
         uint256 rewardAmount = (userShare * rewardPot) / BUFFER;
 
         return uint128(rewardAmount);
+    }
+
+    function _updateReward(Balance memory userBal) internal {
+        // TODO: update reward of a user
     }
 
     /*//////////////////////////////////////////////////////////////
