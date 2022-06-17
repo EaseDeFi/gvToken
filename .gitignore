@@ -9,3 +9,6 @@ src/types
 #Hardhat files
 cache
 artifacts
+
+# local files
+ScratchPad.md
