@@ -1,0 +1,318 @@
+import { expect } from "chai";
+import { formatEther, getContractAddress } from "ethers/lib/utils";
+import { ethers } from "hardhat";
+import { EaseToken__factory } from "../src/types";
+import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
+import { getPermitSignature } from "./helpers";
+import { Contracts, Signers } from "./types";
+import { ether, getTimestamp, increase, mine, TIME_IN_SECS } from "./utils";
+
+describe("BribePot", function () {
+  const contracts = {} as Contracts;
+  const signers = {} as Signers;
+  before(async function () {
+    const accounts = await ethers.getSigners();
+    signers.gvToken = accounts[0];
+    signers.gov = accounts[1];
+    signers.briber = accounts[2];
+    signers.alice = accounts[3];
+    signers.bob = accounts[4];
+    signers.otherAccounts = accounts.slice(5);
+  });
+
+  beforeEach(async function () {
+    const EaseTokenFactory = <EaseToken__factory>(
+      await ethers.getContractFactory("EaseToken")
+    );
+
+    const BribePotFactory = <BribePot__factory>(
+      await ethers.getContractFactory("BribePot")
+    );
+
+    const nonce = await signers.gvToken.getTransactionCount();
+    const easeAddress = getContractAddress({
+      from: signers.gvToken.address,
+      nonce,
+    });
+
+    contracts.ease = await EaseTokenFactory.deploy(signers.gvToken.address);
+
+    contracts.bribePot = await BribePotFactory.deploy(
+      signers.gvToken.address,
+      easeAddress
+    );
+    // fund user accounts with EASE token
+    await contracts.ease
+      .connect(signers.gvToken)
+      .mint(signers.bob.address, ether("1000000"));
+    await contracts.ease
+      .connect(signers.gvToken)
+      .mint(signers.alice.address, ether("1000000"));
+    await contracts.ease
+      .connect(signers.gvToken)
+      .mint(signers.gvToken.address, ether("1000000"));
+    await contracts.ease
+      .connect(signers.gvToken)
+      .mint(signers.briber.address, ether("1000000"));
+  });
+
+  describe("restricted", function () {
+    it("should restrict address other than gvToken", async function () {
+      await expect(
+        contracts.bribePot
+          .connect(signers.bob)
+          .deposit(signers.alice.address, ether("100"))
+      ).to.revertedWith("only gvToken");
+      await expect(
+        contracts.bribePot
+          .connect(signers.bob)
+          .withdraw(signers.alice.address, ether("100"))
+      ).to.revertedWith("only gvToken");
+      await expect(
+        contracts.bribePot.connect(signers.bob).getReward(signers.alice.address)
+      ).to.revertedWith("only gvToken");
+    });
+  });
+
+  describe("deposit()", function () {
+    it("should allow gvToken to deposit on users behalf", async function () {
+      // Deposit funds on behalf of the user
+      const gvAmount = ether("100");
+      const bobAddress = signers.bob.address;
+      const aliceAddress = signers.alice.address;
+      //   deposit on behalf of bob
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, gvAmount);
+
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+
+      // check alice balance
+      expect(await contracts.bribePot.balanceOf(aliceAddress)).to.equal(
+        gvAmount
+      );
+      // check bob balance
+      expect(await contracts.bribePot.balanceOf(bobAddress)).to.equal(gvAmount);
+
+      //   check totalsupply
+      expect(await contracts.bribePot.totalSupply()).to.equal(gvAmount.mul(2));
+    });
+    it.only("should collect reward on multiple deposit", async function () {
+      // deposit
+      // Deposit funds on behalf of the user
+      const gvAmount = ether("100");
+      const bobAddress = signers.bob.address;
+      //   deposit on behalf of bob
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, gvAmount);
+
+      // add bribe
+      const bribePerWeek = ether("10");
+      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const numOfWeeks = 4;
+      // get signature
+      const value = bribePerWeek.mul(numOfWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      // increase evm time and mine
+      await increase((TIME_IN_SECS.week + 100) * 2);
+      await mine();
+      const rewardBefore = await contracts.bribePot.rewards(bobAddress);
+
+      // deposit again
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, gvAmount);
+
+      const rewardAfter = await contracts.bribePot.rewards(bobAddress);
+
+      let rewardPerTokenStored =
+        await contracts.bribePot.rewardPerTokenStored();
+
+      expect(rewardPerTokenStored).to.gt(ether("0.2"));
+
+      expect(rewardAfter.sub(rewardBefore)).to.gt(bribePerWeek.mul(2));
+      await increase((TIME_IN_SECS.week + 100) * 4);
+      await mine();
+      rewardPerTokenStored = await contracts.bribePot.rewardPerTokenStored();
+
+      // deposit again
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, gvAmount);
+
+      console.log(formatEther(rewardPerTokenStored));
+    });
+  });
+  describe("bribe()", function () {
+    it("should fail if total supply of venal pot is 0", async function () {
+      // try to bribe without depositing
+      const bribePerWeek = ether("10");
+      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const numOfWeeks = 4;
+      // get signature
+      const value = bribePerWeek.mul(numOfWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+
+      await expect(
+        contracts.bribePot.bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        })
+      ).to.revertedWith("nothing to bribe");
+    });
+    it("should allow user to bribe the % of pot", async function () {
+      // call deposit
+      const gvAmount = ether("100");
+      const aliceAddress = signers.alice.address;
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+      // call bribe
+      const bribePerWeek = ether("10");
+      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const numOfWeeks = 4;
+      // get signature
+      const value = bribePerWeek.mul(numOfWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      expect(await contracts.ease.balanceOf(spender)).to.equal(value);
+      // check week start
+      // check week end
+    });
+    it("should not allow user to have multiple bribe for same vault", async function () {
+      // call deposit
+      const gvAmount = ether("100");
+      const aliceAddress = signers.alice.address;
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+      // call bribe
+      const bribePerWeek = ether("10");
+      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const numOfWeeks = 4;
+      // get signature
+      const value = bribePerWeek.mul(numOfWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      await expect(
+        contracts.bribePot
+          .connect(signers.briber)
+          .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.revertedWith("bribe already exists");
+    });
+  });
+  describe("cancelBribe()", function () {
+    it("should allow briber to cancel bribe and recieve remaining EASE", async function () {
+      // call deposit
+      const gvAmount = ether("100");
+      const aliceAddress = signers.alice.address;
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+      // call bribe
+      const bribePerWeek = ether("10");
+      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const numOfWeeks = 4;
+      // get signature
+      const briberAddress = signers.briber.address;
+      const value = bribePerWeek.mul(numOfWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      await increase(TIME_IN_SECS.week);
+      await mine();
+      const userEaseBalBefore = await contracts.ease.balanceOf(briberAddress);
+      await contracts.bribePot
+        .connect(signers.briber)
+        .cancelBribe(rcaVaultAddress);
+      const userEaseBalAfter = await contracts.ease.balanceOf(briberAddress);
+      expect(userEaseBalAfter.sub(userEaseBalBefore)).to.equal(
+        bribePerWeek.mul(3)
+      );
+    });
+  });
+
+  describe("withdraw()", async function () {
+    it("should allow user to withdraw gvPower and recieve rewards owed", async function () {
+      // deposit, add bribe, and withdraw after some time
+    });
+  });
+});

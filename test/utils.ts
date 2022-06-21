@@ -70,3 +70,10 @@ export async function resetBlockchain() {
     );
   }
 }
+
+export const TIME_IN_SECS = {
+  day: 60 * 60 * 24,
+  week: 60 * 60 * 24 * 7,
+  month: 60 * 60 * 24 * 30,
+  year: 60 * 60 * 24 * 30 * 12,
+};

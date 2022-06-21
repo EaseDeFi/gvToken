@@ -24,7 +24,7 @@ contract GvToken {
     uint256 internal constant MULTIPLIER = 1e18;
 
     IBribePot public pot;
-    IERC20 public stakingToken;
+    IERC20Permit public stakingToken;
 
     address public gov;
     bytes32 private _powerRoot;
@@ -47,7 +47,7 @@ contract GvToken {
         address _gov
     ) {
         pot = IBribePot(_pot);
-        stakingToken = IERC20(_stakingToken);
+        stakingToken = IERC20Permit(_stakingToken);
         gov = _gov;
     }
 

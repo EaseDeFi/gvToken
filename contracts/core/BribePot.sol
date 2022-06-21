@@ -1,7 +1,10 @@
 /// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "hardhat/console.sol";
+
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../interfaces/IERC20.sol";
 
 // This will be modified version of staking rewards
 // contract of snx. We will replace notifyRewardAmount of staking rewards
@@ -9,22 +12,25 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // solhint-disable not-rely-on-time
 contract BribePot {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20Permit;
+    uint256 constant WEEK = 1 weeks;
+    uint256 constant MULTIPLIER = 1e18;
 
     /* ========== STATE VARIABLES ========== */
 
-    IERC20 public rewardsToken;
+    IERC20Permit public rewardsToken;
     address public depositToken;
     uint256 public periodFinish = 0;
-    uint256 public rewardRate = 0;
+    uint256 public bribeRate = 0;
     uint256 public rewardsDuration = 7 days;
-    uint256 public lastUpdateTime;
+    uint256 public lastRewardUpdate;
     uint256 public rewardPerTokenStored;
-    uint256 public lastExpiry;
+    // week for which bribe has been expired upto
+    uint256 public lastExpiryWeek;
 
     uint256 public immutable genesis = block.timestamp;
 
-    // rca-vault => user => BribeDetails
+    // user => rca-vault => BribeDetails
     mapping(address => mapping(address => BribeDetail)) internal bribes;
     // week => amount of ease expiring
     mapping(uint256 => BribeRate) internal bribeRates;
@@ -37,8 +43,11 @@ contract BribePot {
     /* ========== CONSTRUCTOR ========== */
 
     constructor(address _depositToken, address _rewardsToken) {
-        rewardsToken = IERC20(_rewardsToken);
+        rewardsToken = IERC20Permit(_rewardsToken);
         depositToken = _depositToken;
+        lastRewardUpdate = block.timestamp;
+        lastExpiryWeek = getCurrWeek();
+        periodFinish = block.timestamp;
     }
 
     /* ========== VIEWS ========== */
@@ -61,21 +70,19 @@ contract BribePot {
         }
         return
             rewardPerTokenStored +
-            (lastTimeRewardApplicable() -
-                ((lastUpdateTime) * (rewardRate) * (1e18)) /
+            (((lastTimeRewardApplicable() - lastRewardUpdate) * bribeRate) /
                 (_totalSupply));
     }
 
     function earned(address account) public view returns (uint256) {
         return
-            (_balances[account] *
+            ((_balances[account] *
                 (rewardPerToken() - (userRewardPerTokenPaid[account]))) /
-            (1e18) +
-            (rewards[account]);
+                (MULTIPLIER)) + rewards[account];
     }
 
     function getRewardForDuration() external view returns (uint256) {
-        return rewardRate * rewardsDuration;
+        return bribeRate * rewardsDuration;
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
@@ -83,9 +90,10 @@ contract BribePot {
     function deposit(address from, uint256 amount)
         external
         onlyGvToken(msg.sender)
-        updateReward(from)
     {
         require(amount > 0, "Cannot stake 0");
+        updateBribes();
+        updateReward(from);
         _totalSupply = _totalSupply + amount;
         _balances[from] = _balances[from] + amount;
         emit Deposited(from, amount);
@@ -94,23 +102,22 @@ contract BribePot {
     function withdraw(address from, uint256 amount)
         public
         onlyGvToken(msg.sender)
-        updateReward(from)
     {
         require(amount > 0, "Cannot withdraw 0");
+        updateBribes();
+        updateReward(from);
         _totalSupply = _totalSupply - amount;
         _balances[from] = _balances[from] - amount;
         emit Withdrawn(from, amount);
     }
 
-    function getReward(address user)
-        public
-        onlyGvToken(msg.sender)
-        updateReward(user)
-    {
+    function getReward(address user) public onlyGvToken(msg.sender) {
+        updateBribes();
+        updateReward(user);
         uint256 reward = rewards[user];
         if (reward > 0) {
             rewards[user] = 0;
-            rewardsToken.safeTransfer(user, reward);
+            rewardsToken.safeTransfer(depositToken, reward);
             emit RewardPaid(user, reward);
         }
     }
@@ -120,53 +127,25 @@ contract BribePot {
         getReward(user);
     }
 
-    /* ========== MUTATIVE FUNCTIONS ========== */
-
-    // TODO: remove this function once you fully implement bribe
-    // Keeping this for reference
-    function notifyRewardAmount(uint256 reward)
-        external
-        updateReward(address(0))
-    {
-        if (block.timestamp >= periodFinish) {
-            rewardRate = reward / rewardsDuration;
-        } else {
-            uint256 remaining = periodFinish - block.timestamp;
-            uint256 leftover = remaining - rewardRate;
-            rewardRate = reward + (leftover / rewardsDuration);
-        }
-
-        // Ensure the provided reward amount is not more than the balance in the contract.
-        // This keeps the reward rate in the right range, preventing overflows due to
-        // very high values of rewardRate in the earned and rewardsPerToken functions;
-        // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint256 balance = rewardsToken.balanceOf(address(this));
-        require(
-            rewardRate <= balance / rewardsDuration,
-            "Provided reward too high"
-        );
-
-        lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp + rewardsDuration;
-        emit RewardAdded(reward);
-    }
-
     /* ========== BRIBE LOGIC ========== */
 
     function bribe(
         uint256 bribePerWeek,
         address vault,
-        uint256 numOfWeeks // Total weeks to bribe
+        uint256 numOfWeeks, // Total weeks to bribe
+        PermitArgs memory permit
     ) external {
-        uint256 startWeek = (block.timestamp - genesis / 1 weeks) + 1;
+        require(_totalSupply > 0, "nothing to bribe");
+
+        uint256 startWeek = ((block.timestamp - genesis) / WEEK) + 1;
         uint256 endWeek = startWeek + numOfWeeks;
 
         address briber = msg.sender;
 
         // check if bribe already exists
-        require(!bribes[vault][briber].exists, "bribe already exists");
+        require(!bribes[briber][vault].exists, "bribe already exists");
 
-        bribes[vault][briber] = BribeDetail(
+        bribes[briber][vault] = BribeDetail(
             uint16(startWeek),
             uint16(endWeek),
             true,
@@ -175,25 +154,38 @@ contract BribePot {
 
         // transfer amount to bribe pot
         uint256 amount = bribePerWeek * numOfWeeks;
-        rewardsToken.transferFrom(briber, address(this), amount);
+
+        // TODO: owner, spender and value can be used as msg.sender, address(this), amount
+        rewardsToken.permit(
+            msg.sender,
+            address(this),
+            amount,
+            permit.deadline,
+            permit.v,
+            permit.r,
+            permit.s
+        );
+
+        rewardsToken.safeTransferFrom(briber, address(this), amount);
 
         bribeRates[startWeek].startAmt += uint112(bribePerWeek);
         bribeRates[endWeek].expireAmt += uint112(bribePerWeek);
 
-        // TODO: emit bribe event
+        emit BribeAdded(briber, vault, bribePerWeek, startWeek, endWeek);
     }
 
     function cancelBribe(address vault) external {
         // if bribe seems expensive user can stop streaming
         address briber = msg.sender;
-        BribeDetail memory userBribe = bribes[vault][briber];
-        delete bribes[vault][briber];
+        BribeDetail memory userBribe = bribes[briber][vault];
+        delete bribes[briber][vault];
         uint256 currWeek = getCurrWeek();
 
-        // refund what ever is owed to the user
+        // if bribe starts at week 1 and ends at week 5 that
+        // means number of week bribe will be active is 4 weeks
 
-        // if bribe has expired already this line will error
-        uint256 amountToRefund = (userBribe.endWeek - currWeek) *
+        // if bribe has expired or does not exist this line will error
+        uint256 amountToRefund = (userBribe.endWeek - (currWeek + 1)) *
             userBribe.rate;
 
         // remove expire amt from end week
@@ -203,40 +195,98 @@ contract BribePot {
 
         rewardsToken.safeTransfer(briber, amountToRefund);
         // TODO: emit cancle bribe event
+        emit BribeCanceled(
+            briber,
+            vault,
+            userBribe.rate,
+            currWeek + 1,
+            userBribe.endWeek
+        );
     }
 
-    function expireBribe() public {
+    function updateBribes() public {
+        // This is some kind of expire for us
         uint256 currWeek = getCurrWeek();
-        uint256 week = lastExpiry + 1;
+        uint256 week = lastExpiryWeek;
 
+        // TODO: check last update
+        // if rewardedUpto != 0 that means user action (deposit or withdraw)
+        // was taken in between week epoch, this means we need to update
+        // rewardPerTokenPaid from rewardedUpto to WEEK as bribe expire every
+        // week, let's say the user actions in between week has updated
+        // reward per token stored and last update time which does not
+        // lie at exactly genesis + (n * WEEK) that means user's action
+        // (deposit or withdraw) has made a system update and after that
+        // the reward part has not been updated
+        uint256 rewardedUpto = (lastRewardUpdate - genesis) % WEEK;
+        uint256 addRewardPerToken;
+        // adding 1 to briberate to handle rounding error
+        uint256 currentBribePerWeek = (((bribeRate + 1) * WEEK)) / MULTIPLIER;
         while (currWeek > week) {
-            // TODO: update reward per token paid
+            if (rewardedUpto != 0) {
+                // this means that user withdrew funds in between week
+                // we need to update ratePerTokenStored
+                addRewardPerToken +=
+                    (bribeRate * (WEEK - rewardedUpto)) /
+                    _totalSupply;
+                uint256 rPerToken = (bribeRate * WEEK) / _totalSupply;
+                console.log("R Per Token for week: ", rPerToken);
+                console.log("Rewarded Upto: ");
+                console.log(rewardedUpto);
+                console.log("Bribe Rate: ");
+                console.log(bribeRate);
+                console.log("Reward per token");
+                console.log(addRewardPerToken);
+            } else {
+                // caclulate weeks bribe rate
+                BribeRate memory rates = bribeRates[week];
+                // remove expired amount from bribeRate
+                console.log(currentBribePerWeek);
+                console.log(rates.expireAmt);
+                currentBribePerWeek -= rates.expireAmt;
 
-            // TODO: update reward rate
+                // additional active bribe
+                currentBribePerWeek += rates.startAmt;
 
+                addRewardPerToken += ((currentBribePerWeek * MULTIPLIER) /
+                    _totalSupply);
+            }
+
+            rewardedUpto = 0;
             delete bribeRates[week];
             week++;
             // TODO: emit bribe expired ?
         }
         // update last expiry
-        lastExpiry = week - 1;
+        lastExpiryWeek = week - 1;
+        // TODO: if user is calling withdraw function
+        // at middle of the week we must reward them for that too
+        // I think that will be handled by updateUser part
+
+        // TODO: update reward rate of current or next week
+        currentBribePerWeek += bribeRates[week].startAmt;
+        // update state variables
+        console.log("Current Bribe Per Week", currentBribePerWeek);
+        bribeRate = (currentBribePerWeek * MULTIPLIER) / WEEK;
+
+        rewardPerTokenStored += addRewardPerToken;
+        lastRewardUpdate = genesis + ((week - 1) * WEEK);
+
+        periodFinish = lastRewardUpdate + WEEK;
     }
 
     /* ========== PRIVATE ========== */
     function getCurrWeek() private view returns (uint256) {
-        return block.timestamp - genesis / 1 weeks;
+        return ((block.timestamp - genesis) / WEEK) + 1;
     }
 
     /* ========== MODIFIERS ========== */
 
-    modifier updateReward(address account) {
+    function updateReward(address account) private {
         rewardPerTokenStored = rewardPerToken();
-        lastUpdateTime = lastTimeRewardApplicable();
-        if (account != address(0)) {
-            rewards[account] = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
-        }
-        _;
+        lastRewardUpdate = lastTimeRewardApplicable();
+        rewards[account] = earned(account);
+        userRewardPerTokenPaid[account] = rewardPerTokenStored;
     }
 
     modifier onlyGvToken(address caller) {
@@ -252,6 +302,20 @@ contract BribePot {
     event RewardPaid(address indexed user, uint256 reward);
     event RewardsDurationUpdated(uint256 newDuration);
     event Recovered(address token, uint256 amount);
+    event BribeAdded(
+        address indexed user,
+        address indexed vault,
+        uint256 bribePerWeek,
+        uint256 startWeek,
+        uint256 endWeek
+    );
+    event BribeCanceled(
+        address indexed user,
+        address indexed vault,
+        uint256 bribePerWeek,
+        uint256 expiryWeek, // this will always currentWeek + 1
+        uint256 endWeek
+    );
 
     /* ========== STRUCTS ========== */
 
@@ -263,7 +327,13 @@ contract BribePot {
     }
 
     struct BribeRate {
-        uint112 startAmt;
-        uint112 expireAmt;
+        uint128 startAmt;
+        uint128 expireAmt;
+    }
+    struct PermitArgs {
+        uint256 deadline;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
     }
 }
