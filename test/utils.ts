@@ -21,7 +21,7 @@ export function sleep(ms: number) {
   new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function increase(seconds: number) {
+export async function fastForward(seconds: number) {
   const signers = await ethers.getSigners();
   const signer = signers[0];
   await (signer.provider as providers.JsonRpcProvider).send(
@@ -38,10 +38,6 @@ export async function getTimestamp(): Promise<BigNumber> {
     ["latest", false]
   );
   return BigNumber.from(res.timestamp);
-}
-
-export function ether(amount: string): BigNumber {
-  return ethers.utils.parseEther(amount);
 }
 
 export async function mine() {

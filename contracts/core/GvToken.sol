@@ -114,9 +114,9 @@ contract GvToken {
         userBal.growthRate = uint112(growthRate / MULTIPLIER);
 
         stakingToken.permit(
-            args.owner,
-            args.spender,
-            args.value,
+            user,
+            address(this),
+            amount,
             args.deadline,
             args.v,
             args.r,
@@ -256,9 +256,6 @@ contract GvToken {
     }
 
     struct PermitArgs {
-        address owner;
-        address spender;
-        uint256 value;
         uint256 deadline;
         uint8 v;
         bytes32 r;

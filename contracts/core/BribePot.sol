@@ -8,7 +8,7 @@ import "../interfaces/IERC20.sol";
 
 // This will be modified version of staking rewards
 // contract of snx. We will replace notifyRewardAmount of staking rewards
-// with bribe() and figure out to implement cancleBribe() and expireBribe()
+// with bribe() and figure out to implement cancelBribe() and expireBribe()
 
 // solhint-disable not-rely-on-time
 contract BribePot {
@@ -104,6 +104,10 @@ contract BribePot {
         onlyGvToken(msg.sender)
     {
         require(amount > 0, "Cannot withdraw 0");
+        // TODO: user should not be able to withdraw if
+        // bribe is active and he/she is the only user in the contract
+        // revert if _totalSupply-amount == 0 when bribe is active
+
         updateBribes();
         updateReward(from);
         _totalSupply = _totalSupply - amount;
@@ -111,7 +115,11 @@ contract BribePot {
         emit Withdrawn(from, amount);
     }
 
-    function getReward(address user) public onlyGvToken(msg.sender) {
+    function getReward(address user)
+        public
+        onlyGvToken(msg.sender)
+        returns (uint256)
+    {
         updateBribes();
         updateReward(user);
         uint256 reward = rewards[user];
@@ -120,6 +128,7 @@ contract BribePot {
             rewardsToken.safeTransfer(depositToken, reward);
             emit RewardPaid(user, reward);
         }
+        return reward;
     }
 
     function exit(address user) external onlyGvToken(msg.sender) {
@@ -138,7 +147,7 @@ contract BribePot {
         require(_totalSupply > 0, "nothing to bribe");
 
         uint256 startWeek = ((block.timestamp - genesis) / WEEK) + 1;
-        uint256 endWeek = startWeek + numOfWeeks;
+        uint256 endWeek = startWeek + numOfWeeks - 1;
 
         address briber = msg.sender;
 
@@ -185,7 +194,7 @@ contract BribePot {
         // means number of week bribe will be active is 4 weeks
 
         // if bribe has expired or does not exist this line will error
-        uint256 amountToRefund = (userBribe.endWeek - (currWeek + 1)) *
+        uint256 amountToRefund = (userBribe.endWeek - currWeek) *
             userBribe.rate;
 
         // remove expire amt from end week
@@ -224,25 +233,18 @@ contract BribePot {
         uint256 currentBribePerWeek = (((bribeRate + 1) * WEEK)) / MULTIPLIER;
         while (currWeek > week) {
             if (rewardedUpto != 0) {
-                // this means that user withdrew funds in between week
+                // this means that user deposited or withdrew funds in between week
                 // we need to update ratePerTokenStored
-                addRewardPerToken +=
-                    (bribeRate * (WEEK - rewardedUpto)) /
-                    _totalSupply;
-                uint256 rPerToken = (bribeRate * WEEK) / _totalSupply;
-                console.log("R Per Token for week: ", rPerToken);
-                console.log("Rewarded Upto: ");
-                console.log(rewardedUpto);
-                console.log("Bribe Rate: ");
-                console.log(bribeRate);
-                console.log("Reward per token");
-                console.log(addRewardPerToken);
+                // TODO: WHAT IF TOTAL SUPPLY IS ZERO?
+                if (_totalSupply != 0) {
+                    addRewardPerToken +=
+                        (bribeRate * (WEEK - rewardedUpto)) /
+                        _totalSupply;
+                }
             } else {
                 // caclulate weeks bribe rate
                 BribeRate memory rates = bribeRates[week];
                 // remove expired amount from bribeRate
-                console.log(currentBribePerWeek);
-                console.log(rates.expireAmt);
                 currentBribePerWeek -= rates.expireAmt;
 
                 // additional active bribe
@@ -259,14 +261,9 @@ contract BribePot {
         }
         // update last expiry
         lastExpiryWeek = week - 1;
-        // TODO: if user is calling withdraw function
-        // at middle of the week we must reward them for that too
-        // I think that will be handled by updateUser part
-
-        // TODO: update reward rate of current or next week
+        // update reward rate of current or next week
         currentBribePerWeek += bribeRates[week].startAmt;
         // update state variables
-        console.log("Current Bribe Per Week", currentBribePerWeek);
         bribeRate = (currentBribePerWeek * MULTIPLIER) / WEEK;
 
         rewardPerTokenStored += addRewardPerToken;
