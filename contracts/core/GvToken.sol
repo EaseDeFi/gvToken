@@ -1,7 +1,8 @@
 /// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.11;
 
-// import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "hardhat/console.sol";
 
 import "../interfaces/IERC20.sol";
 import "../library/MerkleProof.sol";
@@ -15,7 +16,9 @@ interface IBribePot {
 
     function exit(address user) external;
 
-    function getReward(address user) external;
+    function getReward(address user) external returns (uint256);
+
+    function balanceOf(address user) external;
 }
 
 contract GvToken {
@@ -23,15 +26,16 @@ contract GvToken {
     uint256 public constant MAX_GROW = 52 weeks;
     uint256 internal constant MULTIPLIER = 1e18;
 
-    IBribePot public pot;
-    IERC20Permit public stakingToken;
+    IBribePot public immutable pot;
+    IERC20Permit public immutable stakingToken;
 
     address public gov;
     bytes32 private _powerRoot;
-    uint256 public withdrawalDelay;
+    // TODO: this should never be less than 14 days
+    uint256 public withdrawalDelay = 14 days;
 
     mapping(address => Balance) private _balance;
-    mapping(address => WithdrawRequest) private withdrawRequests;
+    mapping(address => WithdrawRequest) public withdrawRequests;
 
     // user => total % staked
     mapping(address => uint256) private _totalStaked;
@@ -63,7 +67,7 @@ contract GvToken {
                         DEPOSIT IMPL
     //////////////////////////////////////////////////////////////*/
     function deposit(uint256 amount, PermitArgs memory args) external {
-        _deposit(msg.sender, amount, args);
+        _deposit(msg.sender, amount, args, false);
         emit Deposit(msg.sender, amount);
     }
 
@@ -84,27 +88,29 @@ contract GvToken {
         // collect power for vArmor holders
         _powerCollected[msg.sender] = powerEarned;
 
-        _deposit(msg.sender, amount, args);
+        _deposit(msg.sender, amount, args, false);
         emit Deposit(msg.sender, amount);
     }
 
     function _deposit(
         address user,
         uint256 amount,
-        PermitArgs memory args
+        PermitArgs memory args,
+        bool fromBribePot
     ) private {
         Balance memory userBal = _balance[user];
         // collect power
         uint256 powerCollected = _powerCollected[user];
-        // add power collected until now
-        powerCollected += _powerEarned(userBal, user);
-
-        // gvToken cannot be more than 2 times the deposit
-        if (powerCollected > userBal.amount) {
-            powerCollected = userBal.amount;
+        // add power collected until now if it's not first deposit
+        if (userBal.amount != 0) {
+            powerCollected += _powerEarned(userBal, user);
+            // gvToken cannot be more than 2 times the deposit
+            if (powerCollected > userBal.amount) {
+                powerCollected = userBal.amount;
+            }
+            // update power collected for the user
+            _powerCollected[user] = powerCollected;
         }
-        // update power collected for the user
-        _powerCollected[user] = powerCollected;
 
         userBal.depositStart = uint32(block.timestamp);
         userBal.amount += uint112(amount);
@@ -112,18 +118,19 @@ contract GvToken {
         uint256 growthRate = ((userBal.amount - powerCollected) * MULTIPLIER) /
             MAX_GROW;
         userBal.growthRate = uint112(growthRate / MULTIPLIER);
-
-        stakingToken.permit(
-            user,
-            address(this),
-            amount,
-            args.deadline,
-            args.v,
-            args.r,
-            args.s
-        );
-        // TODO: use safe transfer
-        stakingToken.transferFrom(user, address(this), amount);
+        if (!fromBribePot) {
+            stakingToken.permit(
+                user,
+                address(this),
+                amount,
+                args.deadline,
+                args.v,
+                args.r,
+                args.s
+            );
+            // TODO: use safe transfer
+            stakingToken.transferFrom(user, address(this), amount);
+        }
 
         // Update user balance
         _balance[user] = userBal;
@@ -149,6 +156,7 @@ contract GvToken {
         return _power(user);
     }
 
+    // TODO: pass in user_bal for gas efficiency later
     function _power(address user) private view returns (uint256) {
         // returns gvToken balance of a user
         Balance memory userBal = _balance[user];
@@ -157,19 +165,42 @@ contract GvToken {
         return (userBal.amount + powerCollected + powerEarned);
     }
 
-    function withdrawRequest(uint256 amount) external {
+    function withdrawRequest(uint256 amount, bool bribePot) external {
         address user = msg.sender;
         Balance memory userBal = _balance[user];
         // TODO: check amount deposited to the bribe pot
         // do we want to withdraw from bribe pot on withdraw
         // request?
-
         require(userBal.amount >= amount, "not enough balance");
+
+        uint256 userPower = _power(user);
+        uint256 growthPercentage = (userPower * (MAX_PERCENT / 100)) /
+            userBal.amount;
+        // Withdraw amount in gvPower
+        uint256 amountInGvPower = (growthPercentage * amount) / MAX_PERCENT;
+        uint256 rewards;
+
+        if (bribePot) {
+            // TODO: should withdraw collect rewards too I think yes
+            // you need to figure this out
+            // this line will fail if the user does not have equivalent amount
+            // of gvPower in bribepot wrt ease amount being withdrawn
+            pot.withdraw(user, amountInGvPower);
+            // TODO: add reward amount to the user withdraw amount
+            rewards = pot.getReward(user);
+        } else {
+            require(
+                amountInGvPower <= (userPower - _bribedAmount[user]),
+                "withdraw from bribePot"
+            );
+        }
 
         WithdrawRequest memory currReq = withdrawRequests[user];
 
         uint256 endTime = block.timestamp + withdrawalDelay;
         currReq.endTime = uint32(endTime);
+        currReq.amount += uint112(amount);
+        currReq.rewards += uint112(rewards);
         withdrawRequests[user] = currReq;
 
         userBal.amount -= uint112(amount);
@@ -189,8 +220,9 @@ contract GvToken {
             "withdrawal not yet allowed"
         );
 
-        stakingToken.transfer(user, userReq.amount);
+        stakingToken.transfer(user, userReq.amount + userReq.rewards);
 
+        // TODO: should I care about rewards here
         emit RedeemFinalize(user, userReq.amount);
     }
 
@@ -201,15 +233,6 @@ contract GvToken {
         address user = msg.sender;
         uint256 totalStake = _totalStaked[user];
         totalStake += balancePercent;
-
-        // check for bribed gvBalance
-        uint256 totalPower = _power(user);
-        uint256 stakedAmount = (totalStake * totalPower) / MAX_PERCENT;
-        uint256 bribedAmount = _bribedAmount[msg.sender];
-        require(
-            totalPower <= (stakedAmount + bribedAmount),
-            "cannot stake bribed power"
-        );
 
         require(totalStake < MAX_PERCENT, "can't stake more than 100%");
 
@@ -233,19 +256,14 @@ contract GvToken {
     //////////////////////////////////////////////////////////////*/
     function depositToPot(uint256 amount) external {
         // check for amount staked and gvPower
-        uint256 toalStake = _totalStaked[msg.sender];
-        uint256 totalPower = _power(msg.sender);
-        uint256 stakedAmount = (toalStake * totalPower) / MAX_PERCENT;
-        uint256 bribedAmount = _bribedAmount[msg.sender];
+        address user = msg.sender;
+        uint256 totalPower = _power(user);
+        uint256 bribedAmount = _bribedAmount[user];
 
-        require(
-            totalPower <= (amount + stakedAmount + bribedAmount),
-            "not enough power"
-        );
+        require(totalPower >= (amount + bribedAmount), "not enough power");
 
-        _bribedAmount[msg.sender] += amount;
-        pot.deposit(msg.sender, amount);
-        // TODO: emit an event?
+        _bribedAmount[user] += amount;
+        pot.deposit(user, amount);
     }
 
     // Probably this function will be internal?
@@ -253,6 +271,20 @@ contract GvToken {
         // unlock gvAmount
         _bribedAmount[msg.sender] -= amount;
         pot.withdraw(user, amount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ONLY GOV
+    //////////////////////////////////////////////////////////////*/
+    function setPower(bytes32 root) external onlyGov {
+        _powerRoot = root;
+    }
+
+    function setDelay(uint256 time) external onlyGov {
+        time = (time / 1 weeks) * 1 weeks;
+        // TODO: what should be minimum delay that even gov can't go under
+        require(time > 2 weeks, "min delay 14 days");
+        withdrawalDelay = time;
     }
 
     struct PermitArgs {
@@ -268,7 +300,8 @@ contract GvToken {
     }
 
     struct WithdrawRequest {
-        uint128 amount;
+        uint112 amount;
+        uint112 rewards;
         uint32 endTime;
     }
 
@@ -289,4 +322,7 @@ contract GvToken {
         address indexed vault,
         uint256 percentage
     );
+    // TODO: VIEW FUNCTIONS
+    // 1. user deposit to growth percentage for the frontend
+    // 2. total gvPower staked to different rca Vault's instead of percentage
 }

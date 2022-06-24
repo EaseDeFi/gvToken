@@ -11,14 +11,15 @@ import "../interfaces/IERC20.sol";
 // with bribe() and figure out to implement cancelBribe() and expireBribe()
 
 // solhint-disable not-rely-on-time
+
 contract BribePot {
     using SafeERC20 for IERC20Permit;
-    uint256 constant WEEK = 1 weeks;
-    uint256 constant MULTIPLIER = 1e18;
+    uint256 private constant WEEK = 1 weeks;
+    uint256 private constant MULTIPLIER = 1e18;
 
     /* ========== STATE VARIABLES ========== */
 
-    IERC20Permit public rewardsToken;
+    IERC20Permit public immutable rewardsToken;
     address public depositToken;
     uint256 public periodFinish = 0;
     uint256 public bribeRate = 0;
@@ -111,7 +112,7 @@ contract BribePot {
         updateBribes();
         updateReward(from);
         _totalSupply = _totalSupply - amount;
-        _balances[from] = _balances[from] - amount;
+        _balances[from] -= amount;
         emit Withdrawn(from, amount);
     }
 
