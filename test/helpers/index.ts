@@ -1,5 +1,5 @@
 import { ethers, Signature } from "ethers";
-import { PermitSigArgs } from "./types";
+import { PermitSigArgs } from "../types";
 
 export async function getPermitSignature({
   signer,

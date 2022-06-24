@@ -9,8 +9,8 @@ import type {
   IVArmor,
 } from "../src/types";
 import { MAINNET_ADDRESSES } from "./constants";
-import { ether, resetBlockchain } from "./utils";
-import { getContractAddress } from "ethers/lib/utils";
+import { resetBlockchain } from "./utils";
+import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { expect } from "chai";
 
 describe("TokenSwap", function () {
@@ -35,12 +35,12 @@ describe("TokenSwap", function () {
     // transfer eth to user
     await signers.gov.sendTransaction({
       to: signers.user.address,
-      value: ether("1000"),
+      value: parseEther("1000"),
     });
     // transfer eth to vArmor whale
     await signers.gov.sendTransaction({
       to: vArmorWhale.address,
-      value: ether("1"),
+      value: parseEther("1"),
     });
 
     const EASE_TOKEN_FACTORY = <EaseToken__factory>(
@@ -99,7 +99,7 @@ describe("TokenSwap", function () {
   describe("swap()", function () {
     it("should allow user to swap armor tokens for ease tokens", async function () {
       const userAddress = signers.user.address;
-      const amount = ether("1000");
+      const amount = parseEther("1000");
       await contracts.armor
         .connect(signers.user)
         .approve(contracts.tokenSwap.address, amount);
@@ -110,7 +110,7 @@ describe("TokenSwap", function () {
     });
     it("should allow user to swap vArmor tokens for ease tokens", async function () {
       const userAddress = signers.user.address;
-      const amount = ether("1000");
+      const amount = parseEther("1000");
       await contracts.vArmor
         .connect(signers.user)
         .approve(contracts.tokenSwap.address, amount);
@@ -123,7 +123,7 @@ describe("TokenSwap", function () {
       );
     });
     it("should fail if non armor token holder tries to swap for ease token", async function () {
-      const amount = ether("1000");
+      const amount = parseEther("1000");
       await contracts.armor
         .connect(signers.gov)
         .approve(contracts.tokenSwap.address, amount);
@@ -153,7 +153,7 @@ describe("EaseToken", function () {
     // transfer eth to user
     await signers.gov.sendTransaction({
       to: signers.user.address,
-      value: ether("1000"),
+      value: parseEther("1000"),
     });
 
     const EASE_TOKEN_FACTORY = <EaseToken__factory>(
@@ -169,7 +169,7 @@ describe("EaseToken", function () {
 
   describe("mint()", function () {
     it("should allow minter to mint the token", async function () {
-      const amount = ether("1000");
+      const amount = parseEther("1000");
       const userAddress = signers.user.address;
       const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
       await contracts.ease.connect(signers.user).mint(userAddress, amount);
@@ -177,7 +177,7 @@ describe("EaseToken", function () {
       expect(userEaseBalAfter.sub(userEaseBalBefore)).to.be.equal(amount);
     });
     it("should not allow non minter to mint ease token", async function () {
-      const amount = ether("1000");
+      const amount = parseEther("1000");
       const userAddress = signers.user.address;
       await expect(
         contracts.ease.connect(signers.gov).mint(userAddress, amount)

@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { formatEther, getContractAddress, parseEther } from "ethers/lib/utils";
+import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import { EaseToken__factory } from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
