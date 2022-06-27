@@ -20,7 +20,7 @@ contract BribePot {
     /* ========== STATE VARIABLES ========== */
 
     IERC20Permit public immutable rewardsToken;
-    address public depositToken;
+    address public gvToken;
     uint256 public periodFinish = 0;
     uint256 public bribeRate = 0;
     uint256 public rewardsDuration = 7 days;
@@ -43,9 +43,9 @@ contract BribePot {
 
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _depositToken, address _rewardsToken) {
+    constructor(address _gvToken, address _rewardsToken) {
         rewardsToken = IERC20Permit(_rewardsToken);
-        depositToken = _depositToken;
+        gvToken = _gvToken;
         lastRewardUpdate = block.timestamp;
         lastExpiryWeek = getCurrWeek();
         periodFinish = block.timestamp;
@@ -126,7 +126,7 @@ contract BribePot {
         uint256 reward = rewards[user];
         if (reward > 0) {
             rewards[user] = 0;
-            rewardsToken.safeTransfer(depositToken, reward);
+            rewardsToken.safeTransfer(gvToken, reward);
             emit RewardPaid(user, reward);
         }
         return reward;
@@ -288,7 +288,7 @@ contract BribePot {
     }
 
     modifier onlyGvToken(address caller) {
-        require(caller == depositToken, "only gvToken");
+        require(caller == gvToken, "only gvToken");
         _;
     }
 

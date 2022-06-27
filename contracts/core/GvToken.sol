@@ -5,21 +5,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import "hardhat/console.sol";
 
 import "../interfaces/IERC20.sol";
+import "../interfaces/IBribePot.sol";
 import "../library/MerkleProof.sol";
 
 // solhint-disable not-rely-on-time
-
-interface IBribePot {
-    function deposit(address from, uint256 amount) external;
-
-    function withdraw(address to, uint256 amount) external returns (uint256);
-
-    function exit(address user) external;
-
-    function getReward(address user) external returns (uint256);
-
-    function balanceOf(address user) external;
-}
 
 contract GvToken {
     uint256 public constant MAX_PERCENT = 100_000;
