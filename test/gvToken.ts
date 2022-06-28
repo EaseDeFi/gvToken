@@ -5,6 +5,7 @@ import { ethers } from "hardhat";
 import { EaseToken__factory } from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
 import { GvToken__factory } from "../src/types/factories/contracts/core/GvToken.sol";
+import { RCA_CONTROLLER } from "./constants";
 import { getPermitSignature } from "./helpers";
 import BalanceTree from "./helpers/balance-tree";
 import { Contracts, Signers } from "./types";
@@ -57,7 +58,8 @@ describe("GvToken", function () {
     );
     contracts.bribePot = await BribePotFactory.deploy(
       gvTokenAddress,
-      easeAddress
+      easeAddress,
+      RCA_CONTROLLER
     );
     // fund user accounts with EASE token
     await contracts.ease

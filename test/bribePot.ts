@@ -3,6 +3,7 @@ import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import { EaseToken__factory } from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
+import { RCA_CONTROLLER, RCA_VAULT } from "./constants";
 import { getPermitSignature } from "./helpers";
 import { Contracts, Signers } from "./types";
 import { getTimestamp, fastForward, mine, TIME_IN_SECS } from "./utils";
@@ -39,7 +40,8 @@ describe("BribePot", function () {
 
     contracts.bribePot = await BribePotFactory.deploy(
       signers.gvToken.address,
-      easeAddress
+      easeAddress,
+      RCA_CONTROLLER
     );
     // fund user accounts with EASE token
     await contracts.ease
@@ -111,7 +113,7 @@ describe("BribePot", function () {
 
       // add bribe
       const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 4;
       // get signature
       const value = bribePerWeek.mul(numOfWeeks);
@@ -171,7 +173,7 @@ describe("BribePot", function () {
     it("should fail if total supply of venal pot is 0", async function () {
       // try to bribe without depositing
       const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 4;
       // get signature
       const value = bribePerWeek.mul(numOfWeeks);
@@ -203,7 +205,7 @@ describe("BribePot", function () {
         .deposit(aliceAddress, gvAmount);
       // call bribe
       const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 4;
       // get signature
       const value = bribePerWeek.mul(numOfWeeks);
@@ -237,7 +239,7 @@ describe("BribePot", function () {
         .deposit(aliceAddress, gvAmount);
       // call bribe
       const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 4;
       // get signature
       const value = bribePerWeek.mul(numOfWeeks);
@@ -280,7 +282,7 @@ describe("BribePot", function () {
         .deposit(aliceAddress, gvAmount);
       // call bribe
       const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 4;
       // get signature
       const briberAddress = signers.briber.address;
@@ -327,7 +329,7 @@ describe("BribePot", function () {
         .deposit(aliceAddress, gvAmount);
       // call bribe
       const bribePerWeek = parseEther("0.5");
-      const rcaVaultAddress = signers.otherAccounts[0].address;
+      const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 2;
       // get signature
       const value = bribePerWeek.mul(numOfWeeks);

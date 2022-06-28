@@ -5,6 +5,7 @@ import "hardhat/console.sol";
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IERC20.sol";
+import "../interfaces/IRcaController.sol";
 
 // This will be modified version of staking rewards
 // contract of snx. We will replace notifyRewardAmount of staking rewards
@@ -20,6 +21,7 @@ contract BribePot {
     /* ========== STATE VARIABLES ========== */
 
     IERC20Permit public immutable rewardsToken;
+    IRcaController public immutable rcaController;
     address public gvToken;
     uint256 public periodFinish = 0;
     uint256 public bribeRate = 0;
@@ -43,12 +45,17 @@ contract BribePot {
 
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _gvToken, address _rewardsToken) {
+    constructor(
+        address _gvToken,
+        address _rewardsToken,
+        address _rcaController
+    ) {
         rewardsToken = IERC20Permit(_rewardsToken);
         gvToken = _gvToken;
         lastRewardUpdate = block.timestamp;
         lastExpiryWeek = getCurrWeek();
         periodFinish = block.timestamp;
+        rcaController = IRcaController(_rcaController);
     }
 
     /* ========== VIEWS ========== */
@@ -146,6 +153,8 @@ contract BribePot {
         PermitArgs memory permit
     ) external {
         require(_totalSupply > 0, "nothing to bribe");
+
+        require(rcaController.activeShields(vault), "inactive vault");
 
         uint256 startWeek = ((block.timestamp - genesis) / WEEK) + 1;
         uint256 endWeek = startWeek + numOfWeeks - 1;
