@@ -6,7 +6,6 @@ interface IGvTokenFinal {
     struct Deposit {
         uint128 amount;
         uint32 start;
-        bool withdrawn;
     }
 
     struct PermitArgs {
@@ -17,9 +16,10 @@ interface IGvTokenFinal {
     }
 
     struct WithdrawRequest {
-        uint112 amount;
-        uint112 rewards;
+        uint128 amount;
+        uint128 rewards;
         uint32 endTime;
+        uint16 popCount; // index of _deposits
     }
     /* ========== CONSTANTS ========== */
     event Deposited(address indexed user, uint256 amount);

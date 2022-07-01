@@ -2,6 +2,7 @@
 pragma solidity ^0.8.11;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "hardhat/console.sol";
 
 import "../interfaces/IERC20.sol";
 import "../interfaces/IGvTokenFinal.sol";
@@ -40,6 +41,7 @@ contract GvTokenFinal is IGvTokenFinal {
     /* ========== PRIVATE VARIABLES ========== */
     bytes32 private _powerRoot;
     mapping(address => Deposit[]) private _deposits;
+    mapping(address => uint256) private _totalDeposit;
     mapping(address => uint256) private _totalStaked;
     mapping(address => mapping(address => uint256)) private _stakes;
 
@@ -98,13 +100,12 @@ contract GvTokenFinal is IGvTokenFinal {
     }
 
     function balanceOf(address user) external view returns (uint256) {
-        uint256 timestamp = (block.timestamp / WEEK) * WEEK;
-
         (uint256 depositAmount, uint256 powerEarned) = _balanceOf(
             user,
-            timestamp,
+            block.timestamp,
             false
         );
+
         return depositAmount + powerEarned;
     }
 
@@ -113,11 +114,6 @@ contract GvTokenFinal is IGvTokenFinal {
         view
         returns (uint256)
     {
-        // TODO: how to handle if timestamp is more than withdrawal delay?
-        // as we remove the deposits from array on withdraw and it's very
-        // expensive to take user snapshot on every user interaction
-        // it's almost impossible to handle this situation
-        timestamp = (timestamp / WEEK) * WEEK;
         (uint256 depositAmount, uint256 powerEarned) = _balanceOf(
             user,
             timestamp,
@@ -139,17 +135,36 @@ contract GvTokenFinal is IGvTokenFinal {
     function _balanceOf(
         address user,
         uint256 timestamp,
-        bool includeWithdrawn
-    ) private view returns (uint256 powerEarned, uint256 depositBalance) {
-        Deposit[] memory userDeposits = _deposits[user];
+        bool includeWithdrawal
+    ) private view returns (uint256 depositBalance, uint256 powerEarned) {
+        depositBalance = _totalDeposit[user];
 
-        for (uint256 i = 0; i < userDeposits.length; i++) {
-            Deposit memory userDeposit = _deposits[user][i];
-            if (!includeWithdrawn && userDeposit.withdrawn) {
+        WithdrawRequest memory currRequest = withdrawRequests[user];
+        uint256 length = _deposits[user].length;
+        uint256 i = includeWithdrawal ? length : length - currRequest.popCount;
+
+        uint256 depositIncluded;
+        for (i; i > 0; i--) {
+            Deposit memory userDeposit = _deposits[user][i - 1];
+            // as we increase gvPower weekly
+            if (timestamp - userDeposit.start > MAX_GROW) {
                 break;
             }
-            depositBalance += userDeposit.amount;
+            // as we consider user's fund to grow on a weekly basis
+            // we need to normalize time to calculate exact power earned
+            // both timestamp and depositStart
+
+            depositIncluded += userDeposit.amount;
             powerEarned += _powerEarned(userDeposit, timestamp);
+        }
+        // add amount of max_grow achieved to powerEarned
+        if (includeWithdrawal) {
+            // add withdrawal amount
+            powerEarned +=
+                (depositBalance + currRequest.amount) -
+                depositIncluded;
+        } else {
+            powerEarned += (depositBalance - depositIncluded);
         }
     }
 
@@ -158,21 +173,16 @@ contract GvTokenFinal is IGvTokenFinal {
         pure
         returns (uint256)
     {
-        //
-        uint256 time = (timestamp / WEEK) * WEEK;
+        uint256 currentTime = (timestamp / WEEK) * WEEK;
+        // user deposit starts gaining power next week
+        uint256 depositStart = ((userDeposit.start / WEEK) + 1) * WEEK;
 
-        // growth starts next week from deposit
-        if (userDeposit.start > time) {
-            return 0;
+        uint256 timeSinceDeposit;
+        if (currentTime > depositStart) {
+            timeSinceDeposit = currentTime - depositStart;
         }
 
-        uint256 timeSinceDeposit = time - userDeposit.start;
-        // max grow has been achieved
-        if (timeSinceDeposit >= MAX_GROW) {
-            return userDeposit.amount;
-        }
-
-        uint256 powerGrowth = (userDeposit.start *
+        uint256 powerGrowth = (userDeposit.amount *
             ((timeSinceDeposit * MULTIPLIER) / MAX_GROW)) / MULTIPLIER;
         return powerGrowth;
     }
@@ -183,8 +193,12 @@ contract GvTokenFinal is IGvTokenFinal {
 
     function deposit(uint256 amount, PermitArgs memory args) external {
         // round depositStart to week
-        uint256 depositStart = ((block.timestamp / WEEK) + 1) * WEEK;
-        _deposit(msg.sender, amount, depositStart, args, false);
+        address user = msg.sender;
+        uint256 rewardAmount;
+        if (bribedAmount[user] != 0) {
+            rewardAmount = pot.getReward(user);
+        }
+        _deposit(user, amount, rewardAmount, block.timestamp, args, false);
     }
 
     // for vArmor holders
@@ -194,37 +208,34 @@ contract GvTokenFinal is IGvTokenFinal {
         bytes32[] memory proof,
         PermitArgs memory args
     ) external {
-        bytes32 leaf = keccak256(
-            abi.encodePacked(msg.sender, amount, depositStart)
-        );
+        address user = msg.sender;
+        bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
 
         require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
         require(depositStart >= genesis, "can't deposit before genesis");
 
-        // round depositStart to week
-        depositStart = ((depositStart / WEEK) + 1) * WEEK;
-
+        uint256 rewardAmount;
+        if (bribedAmount[user] != 0) {
+            rewardAmount = pot.getReward(user);
+        }
         // collect power for vArmor holders
-        _deposit(msg.sender, amount, depositStart, args, false);
+        _deposit(user, amount, rewardAmount, depositStart, args, false);
     }
 
     function _deposit(
         address user,
         uint256 amount,
+        uint256 rewardAmount,
         uint256 depositStart,
         PermitArgs memory args,
         bool fromBribePot
     ) private {
-        uint256 rewardAmount;
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
         Deposit memory newDeposit = Deposit(
             uint128(amount + rewardAmount),
-            uint32(depositStart),
-            false
+            uint32(depositStart)
         );
 
+        // we transfer from user if we are not just compounding rewards
         if (!fromBribePot) {
             stakingToken.permit(
                 user,
@@ -237,8 +248,9 @@ contract GvTokenFinal is IGvTokenFinal {
             );
             stakingToken.safeTransferFrom(user, address(this), amount);
         }
-
+        // contract wide ease balance
         totalDeposited += newDeposit.amount;
+        _totalDeposit[user] += newDeposit.amount;
         _deposits[user].push(newDeposit);
 
         emit Deposited(user, newDeposit.amount);
@@ -246,39 +258,19 @@ contract GvTokenFinal is IGvTokenFinal {
 
     /* ========== WITHDRAW IMPL ========== */
 
-    function withdrawRequest(uint256 amount, bool fromBribePot) external {
+    function withdrawRequest(uint256 amount, bool includeBribePot) external {
         // what should be the request amount be in I think EASE?
         // update deposits
 
         address user = msg.sender;
-        Deposit memory remainder;
-        uint256 totalAmount;
-        Deposit memory userDeposit;
-        uint256 i = _deposits[user].length;
-        for (i; i > 0; i--) {
-            userDeposit = _deposits[user][i - 1];
-            if (!userDeposit.withdrawn) {
-                totalAmount += userDeposit.amount;
-                if (totalAmount > amount) {
-                    remainder.amount = uint128(totalAmount - amount);
-                    remainder.start = userDeposit.start;
-                    break;
-                }
-                userDeposit.withdrawn = true;
-                _deposits[user][i - 1] = userDeposit;
-            }
-        }
+        require(amount <= _totalDeposit[user], "not enough deposit!");
+        WithdrawRequest memory currRequest = withdrawRequests[user];
 
-        require(totalAmount >= amount, "not enough balance!");
-
-        if (remainder.amount != 0) {
-            Deposit memory lastDepositWithdrawan = _deposits[user][i];
-            lastDepositWithdrawan.amount -= remainder.amount;
-            lastDepositWithdrawan.withdrawn = true;
-
-            _deposits[user][i] = remainder;
-            _deposits[user].push(lastDepositWithdrawan);
-        }
+        uint256 popCount = _updateDepositsAndGetPopCount(
+            user,
+            amount,
+            currRequest
+        );
 
         uint256 timestamp = (block.timestamp / WEEK) * WEEK;
 
@@ -287,32 +279,78 @@ contract GvTokenFinal is IGvTokenFinal {
             timestamp,
             false
         );
-        // 1 Ease = ? gvEASE
-        uint256 conversionRate = (((depositBalance + earnedPower) *
-            MULTIPLIER) / depositBalance);
-        uint256 rewardAmount;
-        if (fromBribePot) {
+        // whether user is willing to withdraw from bribe pot
+        // we will not add reward amount to withdraw if user doesn't
+        // want to withdraw from bribe pot
+        if (includeBribePot && bribedAmount[user] != 0) {
+            uint256 conversionRate = (((depositBalance + earnedPower) *
+                MULTIPLIER) / depositBalance);
             uint256 amountToWithdrawFromPot = (amount * conversionRate) /
                 MULTIPLIER;
-            require(
-                bribedAmount[user] >= amountToWithdrawFromPot,
-                "bribed amount < withdraw amount"
-            );
-
+            if (bribedAmount[user] < amountToWithdrawFromPot) {
+                amountToWithdrawFromPot = bribedAmount[user];
+            }
             pot.withdraw(user, amountToWithdrawFromPot);
-            rewardAmount = pot.getReward(user);
+            // add rewardAmount to withdraw amount
+            currRequest.rewards += uint128(pot.getReward(user));
+            bribedAmount[user] -= amountToWithdrawFromPot;
         }
 
-        WithdrawRequest memory currRequest = withdrawRequests[user];
-        // TODO: should this start from next week?
+        _totalDeposit[user] -= amount;
+
         uint256 endTime = block.timestamp + withdrawalDelay;
         currRequest.endTime = uint32(endTime);
-        currRequest.amount += uint112(amount);
-        currRequest.rewards += uint112(rewardAmount);
-
+        currRequest.amount += uint128(amount);
+        currRequest.popCount += uint16(popCount);
         withdrawRequests[user] = currRequest;
 
         emit RedeemRequest(user, amount, endTime);
+    }
+
+    function _updateDepositsAndGetPopCount(
+        address user,
+        uint256 withDrawAmount,
+        WithdrawRequest memory currRequest
+    ) private returns (uint256) {
+        //
+        Deposit memory remainder;
+        uint256 totalAmount;
+        // current deposit details
+        Deposit memory userDeposit;
+        // index to loop from
+        uint256 startIndex = _deposits[user].length;
+
+        startIndex = currRequest.amount > 0
+            ? (startIndex - currRequest.popCount)
+            : startIndex;
+        uint256 i = startIndex;
+        for (i; i > 0; i--) {
+            userDeposit = _deposits[user][i - 1];
+            totalAmount += userDeposit.amount;
+            // Let's say user tries to withdraw 100 EASE and they have
+            // multiple ease deposits [75, 30] EASE when our loop is
+            // at index 0 total amount will be 105, that means we need
+            // to store the remainder and replace that index later
+            if (totalAmount >= withDrawAmount) {
+                remainder.amount = uint128(totalAmount - withDrawAmount);
+                remainder.start = userDeposit.start;
+                break;
+            }
+            _deposits[user][i - 1] = userDeposit;
+        }
+
+        // If there is a remainder we need to update the index at which
+        // we broke out of loop and push the withdrawan amount to user
+        // _deposits withdraw 100 ease from [75, 30] EASE balance becomes
+        // [5, 70, 75]
+        if (remainder.amount != 0) {
+            Deposit memory lastDepositWithdrawan = _deposits[user][i - 1];
+            lastDepositWithdrawan.amount -= remainder.amount;
+            _deposits[user][i - 1] = remainder;
+            _deposits[user].push(lastDepositWithdrawan);
+        }
+
+        return startIndex - (i - 1);
     }
 
     function withdrawFinalize() external {
@@ -326,16 +364,13 @@ contract GvTokenFinal is IGvTokenFinal {
             "withdrawal not yet allowed"
         );
 
-        uint256 i = _deposits[user].length;
-        for (i; i > 0; i--) {
-            Deposit memory userDeposit = _deposits[user][i - 1];
-            if (!userDeposit.withdrawn) {
-                break;
-            }
+        // pop off the number of deposits that has been withdrawn
+        for (uint256 i = 0; i < userReq.popCount; i++) {
             _deposits[user].pop();
         }
 
-        stakingToken.safeTransfer(user, userReq.amount + userReq.rewards);
+        uint256 amount = userReq.amount + userReq.rewards;
+        stakingToken.safeTransfer(user, amount);
 
         // TODO: should I care about rewards here?
         emit RedeemFinalize(user, userReq.amount);
@@ -349,8 +384,12 @@ contract GvTokenFinal is IGvTokenFinal {
         // deposit reward
         PermitArgs memory args;
         // TODO: should we limit this deposit call monthly?
-        if (bribedAmount[user] > 0) {
-            _deposit(user, 0, block.timestamp, args, true);
+        uint256 rewardAmount;
+        if (bribedAmount[user] != 0) {
+            rewardAmount = pot.getReward(user);
+        }
+        if (rewardAmount != 0) {
+            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
         }
 
         uint256 totalStake = _totalStaked[user];
@@ -369,8 +408,14 @@ contract GvTokenFinal is IGvTokenFinal {
         // deposit reward
         PermitArgs memory args;
         // TODO: should we limit this deposit call monthly?
-        if (bribedAmount[user] > 0) {
-            _deposit(user, 0, block.timestamp, args, true);
+        uint256 rewardAmount;
+        // collect rewards and add to user _deposits to gain more
+        // gvToken
+        if (bribedAmount[user] != 0) {
+            rewardAmount = pot.getReward(user);
+        }
+        if (rewardAmount != 0) {
+            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
         }
 
         _stakes[vault][user] -= balancePercent;
@@ -381,7 +426,8 @@ contract GvTokenFinal is IGvTokenFinal {
 
     /* ========== BRIBING IMPL ========== */
     function depositToPot(uint256 amount) external {
-        // check for amount staked and gvPower
+        // deposits user gvEase to bribe pot and
+        // get rewards against it
         address user = msg.sender;
         (uint256 amountDeposited, uint256 powerEarned) = _balanceOf(
             user,
@@ -394,15 +440,53 @@ contract GvTokenFinal is IGvTokenFinal {
         require(totalPower >= (amount + bribed), "not enough power");
 
         bribedAmount[user] += amount;
+
         pot.deposit(user, amount);
     }
 
-    // Probably this function will be internal?
-    function withdrawFromPot(uint256 amount, address user) external {
-        // unlock gvAmount
-        // TODO: what are other things I am not caring about here?
-        // I'll come back tomorrow
-        bribedAmount[msg.sender] -= amount;
+    function withdrawFromPot(uint256 amount) external {
+        // withdraws user gvToken from bribe pot
+        address user = msg.sender;
+        PermitArgs memory args;
+        uint256 rewardAmount;
+        // claim reward from the bribe pot
+        if (bribedAmount[user] != 0) {
+            rewardAmount = pot.getReward(user);
+        }
+        // deposit reward to increase user's gvEASE
+        if (rewardAmount != 0) {
+            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
+        }
+
+        _withdrawFromPot(msg.sender, amount);
+    }
+
+    function _withdrawFromPot(address user, uint256 amount) private {
+        bribedAmount[user] -= amount;
         pot.withdraw(user, amount);
+    }
+
+    function claimAndDepositReward() external {
+        address user = msg.sender;
+        uint256 rewardAmount;
+        PermitArgs memory args;
+        if (bribedAmount[user] > 0) {
+            rewardAmount = pot.getReward(user);
+        }
+        if (rewardAmount > 0) {
+            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
+        }
+    }
+
+    /* ========== ONLY GOV ========== */
+    function setPower(bytes32 root) external onlyGov {
+        _powerRoot = root;
+    }
+
+    function setDelay(uint256 time) external onlyGov {
+        time = (time / 1 weeks) * 1 weeks;
+        // TODO: what should be minimum delay that even gov can't go under
+        require(time > 2 weeks, "min delay 14 days");
+        withdrawalDelay = time;
     }
 }

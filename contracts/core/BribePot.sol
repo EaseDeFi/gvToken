@@ -224,9 +224,13 @@ contract BribePot {
     }
 
     function updateBribes() public {
+        // TODO: come back here and fix this total supply issue
         // This is some kind of expire for us
         uint256 currWeek = getCurrWeek();
         uint256 week = lastExpiryWeek;
+        if (_totalSupply == 0) {
+            return;
+        }
 
         // TODO: check last update
         // if rewardedUpto != 0 that means user action (deposit or withdraw)
@@ -259,9 +263,10 @@ contract BribePot {
 
                 // additional active bribe
                 currentBribePerWeek += rates.startAmt;
-
-                addRewardPerToken += ((currentBribePerWeek * MULTIPLIER) /
-                    _totalSupply);
+                if (_totalSupply != 0) {
+                    addRewardPerToken += ((currentBribePerWeek * MULTIPLIER) /
+                        _totalSupply);
+                }
             }
 
             rewardedUpto = 0;
