@@ -1,11 +1,11 @@
 /// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.11;
 
-interface IGvTokenFinal {
-    /* ========== CONSTANTS ========== */
+interface IGvToken {
+    /* ========== STRUCTS ========== */
     struct Deposit {
         uint128 amount;
-        uint32 start;
+        uint128 start;
     }
 
     struct PermitArgs {
@@ -18,10 +18,25 @@ interface IGvTokenFinal {
     struct WithdrawRequest {
         uint128 amount;
         uint128 rewards;
-        uint32 endTime;
-        uint16 popCount; // index of _deposits
+        uint128 endTime;
+        uint128 popCount; // index of _deposits
     }
-    /* ========== CONSTANTS ========== */
+
+    struct SupplyPointer {
+        uint128 amount;
+        uint128 storedAt;
+    }
+
+    struct GrowthRate {
+        uint128 start;
+        uint128 expire;
+    }
+    struct DelegateDetails {
+        address reciever;
+        uint256 amount;
+    }
+
+    /* ========== EVENTS ========== */
     event Deposited(address indexed user, uint256 amount);
     event RedeemRequest(address indexed user, uint256 amount, uint256 endTime);
     event RedeemFinalize(address indexed user, uint256 amount);
@@ -35,5 +50,16 @@ interface IGvTokenFinal {
         address indexed user,
         address indexed vault,
         uint256 percentage
+    );
+
+    event DelegateVotesChanged(
+        address indexed delegate,
+        uint256 previousBalance,
+        uint256 newBalance
+    );
+    event DelegateChanged(
+        address indexed delegator,
+        address indexed fromDelegate,
+        address indexed toDelegate
     );
 }
