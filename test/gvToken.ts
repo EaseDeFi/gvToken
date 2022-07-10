@@ -736,4 +736,82 @@ describe("GvToken", function () {
         .withArgs(userAddress, amount);
     });
   });
+  describe.only("delegate()", function () {
+    it("should delegate and update checkpoint", async function () {
+      const amount = parseEther("100");
+      await depositFor(signers.bob, amount);
+
+      // deposit again
+      await depositFor(signers.bob, amount);
+
+      // forward time
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+      // move delegates
+      await contracts.gvToken.connect(signers.bob).delegate(bobAddress);
+      let bobBalance = await contracts.gvToken.balanceOf(bobAddress);
+
+      let numCheckpoints = await contracts.gvToken.numCheckpoints(bobAddress);
+
+      // bob last checkpoint
+      let lastBobCheckPoint = await contracts.gvToken.checkpoints(
+        bobAddress,
+        numCheckpoints - 1
+      );
+      // bob current vote should be equal to delegated votes
+      expect(lastBobCheckPoint.votes).to.equal(bobBalance);
+
+      // move forward
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+
+      // call delegate to self again
+      await contracts.gvToken.connect(signers.bob).delegate(bobAddress);
+
+      // update variables
+      bobBalance = await contracts.gvToken.balanceOf(bobAddress);
+      numCheckpoints = await contracts.gvToken.numCheckpoints(bobAddress);
+      // bob last checkpoint
+      lastBobCheckPoint = await contracts.gvToken.checkpoints(
+        bobAddress,
+        numCheckpoints - 1
+      );
+
+      // move forward
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+
+      // call delegate to alice
+      await contracts.gvToken.connect(signers.bob).delegate(aliceAddress);
+
+      // update variables
+      bobBalance = await contracts.gvToken.balanceOf(bobAddress);
+      numCheckpoints = await contracts.gvToken.numCheckpoints(bobAddress);
+      // bob last checkpoint
+      lastBobCheckPoint = await contracts.gvToken.checkpoints(
+        bobAddress,
+        numCheckpoints - 1
+      );
+      // bob's checkpoint votes should be 0
+      expect(lastBobCheckPoint.votes).to.equal(0);
+      // alice numCheckpoint
+      const aliceNumCheckpoints = await contracts.gvToken.numCheckpoints(
+        aliceAddress
+      );
+      // alice last checkpoint
+      const lastAliceCheckpoint = await contracts.gvToken.checkpoints(
+        aliceAddress,
+        aliceNumCheckpoints - 1
+      );
+
+      // alice's checkpoint votes should be bob's balance
+      expect(lastAliceCheckpoint.votes).to.equal(bobBalance);
+      // bob's delegated should be equal ot bob's balance
+
+      const bobDelegated = await contracts.gvToken.delegated(bobAddress);
+      // delegated should update upto balance on latest delegate call
+
+      expect(bobDelegated).to.equal(bobBalance);
+    });
+  });
 });
