@@ -1,12 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-import {
-  formatEther,
-  getContractAddress,
-  parseEther,
-  randomBytes,
-} from "ethers/lib/utils";
+import { getContractAddress, parseEther, randomBytes } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import {
   BribePot__factory,
@@ -22,6 +17,10 @@ import { fastForward, getTimestamp, mine, TIME_IN_SECS } from "./utils";
 describe("GvToken", function () {
   const contracts = {} as Contracts;
   const signers = {} as Signers;
+  let userAddress: string;
+  let bobAddress: string;
+  let aliceAddress: string;
+  let briberAddress: string;
   before(async function () {
     const accounts = await ethers.getSigners();
     signers.user = accounts[0];
@@ -31,6 +30,11 @@ describe("GvToken", function () {
     signers.bob = accounts[4];
     signers.briber = accounts[5];
     signers.otherAccounts = accounts.slice(6);
+    // fill in address
+    userAddress = signers.user.address;
+    bobAddress = signers.bob.address;
+    aliceAddress = signers.alice.address;
+    briberAddress = signers.briber.address;
   });
   beforeEach(async function () {
     const EaseTokenFactory = <EaseToken__factory>(
@@ -73,16 +77,16 @@ describe("GvToken", function () {
     // fund user accounts with EASE token
     await contracts.ease
       .connect(signers.user)
-      .mint(signers.bob.address, parseEther("1000000"));
+      .mint(bobAddress, parseEther("1000000"));
     await contracts.ease
       .connect(signers.user)
-      .mint(signers.alice.address, parseEther("1000000"));
+      .mint(aliceAddress, parseEther("1000000"));
     await contracts.ease
       .connect(signers.user)
-      .mint(signers.user.address, parseEther("1000000"));
+      .mint(userAddress, parseEther("1000000"));
     await contracts.ease
       .connect(signers.user)
-      .mint(signers.briber.address, parseEther("1000000"));
+      .mint(briberAddress, parseEther("1000000"));
   });
 
   async function depositFor(user: SignerWithAddress, value: BigNumber) {
@@ -140,7 +144,6 @@ describe("GvToken", function () {
 
   describe("deposit()", function () {
     it("should deposit ease and recieve gv Power", async function () {
-      let userAddress = signers.user.address;
       const value = parseEther("100");
       const deadline = (await getTimestamp()).add(1000);
       const spender = contracts.gvToken.address;
@@ -152,8 +155,8 @@ describe("GvToken", function () {
         spender,
       });
       const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
-      expect(
-        await contracts.gvToken
+      await expect(
+        contracts.gvToken
           .connect(signers.user)
           ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](value, {
             deadline,
@@ -162,7 +165,7 @@ describe("GvToken", function () {
             s,
           })
       )
-        .to.emit(contracts.gvToken, "Deposit")
+        .to.emit(contracts.gvToken, "Deposited")
         .withArgs(userAddress, value);
       const userEaseBalAfter = await contracts.ease.balanceOf(userAddress);
       expect(userEaseBalBefore.sub(userEaseBalAfter)).to.equal(value);
@@ -171,7 +174,6 @@ describe("GvToken", function () {
       expect(power).to.equal(value);
 
       // another user
-      userAddress = signers.bob.address;
       ({ v, r, s } = await getPermitSignature({
         signer: signers.bob,
         token: contracts.ease,
@@ -195,10 +197,8 @@ describe("GvToken", function () {
 
     it("should allow vArmor holders to deposit", async function () {
       // complete this anon
-      const bobAddress = signers.bob.address;
       const bobValue = parseEther("1000");
       const bobDepositStart = (await getTimestamp()).sub(TIME_IN_SECS.month);
-      const aliceAddress = signers.alice.address;
       const aliceValue = parseEther("1200");
       const aliceDepositStart = (await getTimestamp()).sub(
         TIME_IN_SECS.month * 3
@@ -230,14 +230,14 @@ describe("GvToken", function () {
         spender,
       });
       // check for emit too
-      expect(
-        await contracts.gvToken
+      await expect(
+        contracts.gvToken
           .connect(signers.bob)
           [
             "deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"
           ](bobValue, bobDepositStart, bobProof, { v, r, s, deadline })
       )
-        .to.emit(contracts.gvToken, "Deposit")
+        .to.emit(contracts.gvToken, "Deposited")
         .withArgs(bobAddress, bobValue);
 
       const bobGvBal = await contracts.gvToken.balanceOf(bobAddress);
@@ -276,7 +276,6 @@ describe("GvToken", function () {
     });
     it("should deposit multiple times and allow user to bribe,stake,and withdraw ", async function () {
       //
-      const userAddress = signers.user.address;
       const value = parseEther("10");
       let deadline = (await getTimestamp()).add(1000);
       const initialDepositCount = 50;
@@ -449,7 +448,6 @@ describe("GvToken", function () {
     });
     it("should emit Stake event on successful stake", async function () {
       // stake to a vault
-      const userAddress = signers.user.address;
       expect(
         await contracts.gvToken
           .connect(signers.user)
@@ -477,7 +475,6 @@ describe("GvToken", function () {
     });
     it("should collect rewards on behalf of the staker from bribePot", async function () {
       // work
-      const userAddress = signers.user.address;
       const depositsBeforeStake = await contracts.gvToken.getUserDeposits(
         userAddress
       );
@@ -563,7 +560,6 @@ describe("GvToken", function () {
     });
     it("should collect rewards from bribe pot", async function () {
       // unstake to see if rewards has been collected
-      const userAddress = signers.user.address;
       const depositsBefore = await contracts.gvToken.getUserDeposits(
         userAddress
       );
@@ -584,7 +580,6 @@ describe("GvToken", function () {
     });
     it("should emit UnStake event", async function () {
       // call unstake to emit
-      const userAddress = signers.user.address;
       expect(
         await contracts.gvToken
           .connect(signers.user)
@@ -619,30 +614,8 @@ describe("GvToken", function () {
         .depositToPot(value.mul(5).div(10));
       // add 100 gvEase from bob to bribe pot
       await contracts.gvToken.connect(signers.bob).depositToPot(value);
+      await bribeFor(signers.briber, parseEther("10"));
 
-      // add bribe to bribe pot
-      const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = RCA_VAULT;
-      const numOfWeeks = 2;
-      const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
-      const spender = contracts.bribePot.address;
-      const deadline = (await getTimestamp()).add(1000);
-      const { v, r, s } = await getPermitSignature({
-        signer: signers.briber,
-        token: contracts.ease,
-        value: totalBribeAmt,
-        deadline,
-        spender,
-      });
-      // add bribe amount to pot
-      await contracts.bribePot
-        .connect(signers.briber)
-        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
-          deadline,
-          v,
-          r,
-          s,
-        });
       // forward beyond 2nd week
       const genesis = await contracts.bribePot.genesis();
       const timeNeededToReachWeek1 = genesis
@@ -656,7 +629,6 @@ describe("GvToken", function () {
     });
     it("should withdraw from pot if withdraw includes pot", async function () {
       const amount = parseEther("10");
-      const userAddress = signers.user.address;
       await contracts.gvToken.connect(signers.bob).claimAndDepositReward();
       await contracts.gvToken
         .connect(signers.user)
@@ -668,11 +640,100 @@ describe("GvToken", function () {
       const expectedRewardAmount = parseEther("3.33");
       expect(withdrawRequest.rewards).to.gte(expectedRewardAmount);
     });
-    xit("should emit RedeemRequest event", async function () {
+    it("should emit RedeemRequest event", async function () {
       // check for emit
+      const amount = parseEther("10");
+      // 14 days delay
+      const endTime = (await getTimestamp()).add(TIME_IN_SECS.week * 2).add(1);
+      await expect(
+        contracts.gvToken.connect(signers.user).withdrawRequest(amount, true)
+      )
+        .to.emit(contracts.gvToken, "RedeemRequest")
+        .withArgs(userAddress, amount, endTime);
     });
-    xit("should add rewards to current withdraw request", async function () {
+    it("should add rewards to current withdraw request", async function () {
       // do something
+      const amount = parseEther("10");
+      await contracts.gvToken
+        .connect(signers.user)
+        .withdrawRequest(amount, true);
+      const withdrawRequest = await contracts.gvToken.withdrawRequests(
+        userAddress
+      );
+      const expectedReward = parseEther("3.33");
+      expect(withdrawRequest.rewards).to.gt(expectedReward);
+    });
+  });
+  describe("withdrawFinalize()", function () {
+    this.beforeEach(async function () {
+      const value = parseEther("100");
+      // deposit bob
+      await depositFor(signers.bob, value);
+
+      // deposit user
+      await depositFor(signers.user, value);
+
+      // deposit to pot
+      // add 50 gvEase from user to bribe pot
+      await contracts.gvToken
+        .connect(signers.user)
+        .depositToPot(value.mul(5).div(10));
+      // add 100 gvEase from bob to bribe pot
+      await contracts.gvToken.connect(signers.bob).depositToPot(value);
+      await bribeFor(signers.briber, parseEther("10"));
+
+      // forward beyond 2nd week
+      const genesis = await contracts.bribePot.genesis();
+      const timeNeededToReachWeek1 = genesis
+        .add(TIME_IN_SECS.week)
+        .sub(await getTimestamp());
+      // move beyond week2
+      await fastForward(
+        timeNeededToReachWeek1.add(TIME_IN_SECS.week).toNumber()
+      );
+      await mine();
+    });
+    it("should not allow user to finalize withraw before delay", async function () {
+      // do something
+      const amount = parseEther("10");
+      await contracts.gvToken
+        .connect(signers.user)
+        .withdrawRequest(amount, true);
+      await expect(
+        contracts.gvToken.connect(signers.user).withdrawFinalize()
+      ).to.revertedWith("withdrawal not yet allowed");
+    });
+    it("should allow user to finalize withdarw after delay", async function () {
+      const amount = parseEther("10");
+      await contracts.gvToken
+        .connect(signers.user)
+        .withdrawRequest(amount, true);
+      // forward time beyond delay
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+
+      const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
+      await contracts.gvToken.connect(signers.user).withdrawFinalize();
+      const userEaseBalAfter = await contracts.ease.balanceOf(userAddress);
+
+      const expectedReward = parseEther("3.33");
+
+      expect(userEaseBalAfter.sub(userEaseBalBefore)).to.gt(
+        amount.add(expectedReward)
+      );
+    });
+    it("should emit RedeemFinalize event with valid args", async function () {
+      const amount = parseEther("10");
+      await contracts.gvToken
+        .connect(signers.user)
+        .withdrawRequest(amount, true);
+      // forward time beyond delay
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+
+      await expect(contracts.gvToken.connect(signers.user).withdrawFinalize())
+        .to.emit(contracts.gvToken, "RedeemFinalize")
+        .withArgs(userAddress, amount);
     });
   });
 });
