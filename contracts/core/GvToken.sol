@@ -13,6 +13,7 @@ import "../library/MerkleProof.sol";
 // solhint-disable not-rely-on-time
 // solhint-disable reason-string
 // solhint-disable max-states-count
+// solhint-disable no-inline-assembly
 
 contract GvToken is IGvToken {
     using SafeERC20 for IERC20Permit;
