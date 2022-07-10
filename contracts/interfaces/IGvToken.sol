@@ -3,6 +3,12 @@ pragma solidity ^0.8.11;
 
 interface IGvToken {
     /* ========== STRUCTS ========== */
+    struct MetaData {
+        string name;
+        string symbol;
+        uint256 decimals;
+    }
+
     struct Deposit {
         uint128 amount;
         uint128 start;
@@ -36,6 +42,11 @@ interface IGvToken {
         uint256 amount;
     }
 
+    /// @notice A checkpoint for marking number of votes from a given block
+    struct Checkpoint {
+        uint32 fromBlock;
+        uint256 votes;
+    }
     /* ========== EVENTS ========== */
     event Deposited(address indexed user, uint256 amount);
     event RedeemRequest(address indexed user, uint256 amount, uint256 endTime);
