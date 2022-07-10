@@ -736,7 +736,7 @@ describe("GvToken", function () {
         .withArgs(userAddress, amount);
     });
   });
-  describe.only("delegate()", function () {
+  describe("delegate()", function () {
     it("should delegate and update checkpoint", async function () {
       const amount = parseEther("100");
       await depositFor(signers.bob, amount);
