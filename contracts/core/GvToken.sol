@@ -24,27 +24,37 @@ contract GvToken is IGvToken {
     uint256 internal constant MULTIPLIER = 1e18;
 
     /* ========== METADATA ========== */
-    /* ========== METADATA ========== */
     MetaData private metadata = MetaData("Growing Vote Ease", "gvEase", 18);
 
     /* ========== PUBLIC VARIABLES ========== */
     IBribePot public immutable pot;
     IERC20Permit public immutable stakingToken;
     IRcaController public immutable rcaController;
+    /// @notice Timestamp rounded in weeks for earliest vArmor staker
     uint32 public immutable genesis;
     address public gov;
+    /// @notice total amount of EASE deposited
     uint256 public totalDeposited;
 
+    /// @notice Time delay for withdrawals which will be set by governance
     uint256 public withdrawalDelay = 14 days;
 
     mapping(address => WithdrawRequest) public withdrawRequests;
+    /// @notice amount of gvEASE bribed to bribe Pot
     mapping(address => uint256) public bribedAmount;
 
     /* ========== PRIVATE VARIABLES ========== */
+    /// @notice merkle root of vArmor stakers for giving them
+    /// extra deposit start time
     bytes32 private _powerRoot;
+    /// @notice User deposits of ease tokens including rewards from bribe pot
     mapping(address => Deposit[]) private _deposits;
+    /// @notice total amount of ease deposited on user behalf
     mapping(address => uint256) private _totalDeposit;
+    /// @notice Total percent of balance staked by user to different RCA-vaults
     mapping(address => uint256) private _totalStaked;
+    /// @notice Percentage of gvEASE stake to each RCA-vault
+    /// user => rcaVault => % of gvEASE
     mapping(address => mapping(address => uint256)) private _stakes;
 
     constructor(
@@ -52,7 +62,7 @@ contract GvToken is IGvToken {
         address _stakingToken,
         address _rcaController,
         address _gov,
-        uint256 _genesis //this should be < vArmor holder start time
+        uint256 _genesis //this should be < first vArmor holder start time
     ) {
         pot = IBribePot(_pot);
         stakingToken = IERC20Permit(_stakingToken);
@@ -198,7 +208,6 @@ contract GvToken is IGvToken {
     /* ========== DEPOSIT IMPL ========== */
 
     function deposit(uint256 amount, PermitArgs memory args) external {
-        // round depositStart to week
         address user = msg.sender;
         uint256 rewardAmount;
         if (bribedAmount[user] != 0) {
@@ -207,7 +216,8 @@ contract GvToken is IGvToken {
         _deposit(user, amount, rewardAmount, block.timestamp, args, false);
     }
 
-    // for vArmor holders
+    /// @notice Deposit for vArmor holders to give them
+    /// extra power when migrating
     function deposit(
         uint256 amount,
         uint256 depositStart,
@@ -264,10 +274,12 @@ contract GvToken is IGvToken {
 
     /* ========== WITHDRAW IMPL ========== */
 
+    /// @notice Request redemption of gvEASE back to ease
+    /// Has a withdrawal delay which will work in 2 parts(request and finalize)
+    /// @param amount The amount of tokens in EASE to withdraw
+    /// @param includeBribePot Boolean that will withdraw
+    /// gvEASE from bribe pot if true
     function withdrawRequest(uint256 amount, bool includeBribePot) external {
-        // what should be the request amount be in I think EASE?
-        // update deposits
-
         address user = msg.sender;
         require(amount <= _totalDeposit[user], "not enough deposit!");
         WithdrawRequest memory currRequest = withdrawRequests[user];
@@ -359,6 +371,8 @@ contract GvToken is IGvToken {
         return startIndex - (i - 1);
     }
 
+    /// @notice Used to exchange gvEASE back to ease token and transfers
+    /// pending EASE withdrawal amount to the user if withdrawal delay is over
     function withdrawFinalize() external {
         // Finalize withdraw of a user
         address user = msg.sender;
@@ -383,7 +397,10 @@ contract GvToken is IGvToken {
     }
 
     /* ========== STAKE IMPL ========== */
-
+    /// @notice Stakes percentage of user gvEASE to a RCA-vault of choice
+    /// @param balancePercent percentage of users balance to
+    /// stake to RCA-vault
+    /// @param vault RCA-vault address
     function stake(uint256 balancePercent, address vault) external {
         require(rcaController.activeShields(vault), "vault not active");
         address user = msg.sender;
@@ -409,14 +426,17 @@ contract GvToken is IGvToken {
         emit Stake(user, vault, balancePercent);
     }
 
+    /// @notice Unstakes percent share of users balance from RCA-vault
+    /// @param balancePercent percentage of users balance to
+    /// unstake from RCA-vault
+    /// @param vault RCA-vault address
     function unStake(uint256 balancePercent, address vault) external {
         address user = msg.sender;
         // deposit reward
         PermitArgs memory args;
         // TODO: should we limit this deposit call monthly?
         uint256 rewardAmount;
-        // collect rewards and add to user _deposits to gain more
-        // gvToken
+        // collect rewards and add to user _deposits to gain more gvToken
         if (bribedAmount[user] != 0) {
             rewardAmount = pot.getReward(user);
         }
@@ -431,6 +451,10 @@ contract GvToken is IGvToken {
     }
 
     /* ========== BRIBING IMPL ========== */
+
+    /// @notice Deposits gvEASE of an account to bribe pot
+    /// in order to get rewards
+    /// @param amount Amount of gvEASE to bribe to bribe pot
     function depositToPot(uint256 amount) external {
         // deposits user gvEase to bribe pot and
         // get rewards against it
@@ -450,6 +474,8 @@ contract GvToken is IGvToken {
         pot.deposit(user, amount);
     }
 
+    /// @notice Withdraws user bribed amount from bribe
+    /// pot and collects earned rewards
     function withdrawFromPot(uint256 amount) external {
         // withdraws user gvToken from bribe pot
         address user = msg.sender;
@@ -472,6 +498,8 @@ contract GvToken is IGvToken {
         pot.withdraw(user, amount);
     }
 
+    /// @notice Allows account to claim rewards from Bribe pot and deposit
+    /// to gain more gvEASE
     function claimAndDepositReward() external {
         address user = msg.sender;
         uint256 rewardAmount;

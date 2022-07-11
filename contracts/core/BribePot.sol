@@ -7,10 +7,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import "../interfaces/IERC20.sol";
 import "../interfaces/IRcaController.sol";
 
-// This will be modified version of staking rewards
-// contract of snx. We will replace notifyRewardAmount of staking rewards
-// with bribe() and figure out to implement cancelBribe() and expireBribe()
-
 // solhint-disable not-rely-on-time
 
 contract BribePot {
@@ -23,24 +19,31 @@ contract BribePot {
     IERC20Permit public immutable rewardsToken;
     IRcaController public immutable rcaController;
     address public gvToken;
+    /// @notice A week period from last week that uses
+    /// bribePerWeek to calculate bribe rate.
     uint256 public periodFinish = 0;
+    /// @notice A dynamic total amount of EASE token to bribe whole pot
     uint256 public bribePerWeek = 0;
+    /// @notice Last updated timestamp
     uint256 public lastRewardUpdate;
     uint256 public rewardPerTokenStored;
-    // week upto which bribes has been updated (aka expired)
+    /// @notice week upto which bribes has been updated (aka expired)
     uint256 public lastBribeUpdate;
 
-    /// @notice nearest week in timestamp before deplyment
+    /// @notice Nearest week in timestamp before deployment
     uint256 public immutable genesis = (block.timestamp / WEEK) * WEEK;
 
-    // user => rca-vault => BribeDetails
+    /// @notice user => rca-vault => BribeDetail
     mapping(address => mapping(address => BribeDetail)) public bribes;
-    // week => amount of ease expiring
+    /// @notice weekNumber => Bribes that activate and expire every week
     mapping(uint256 => BribeRate) internal bribeRates;
     mapping(address => uint256) public userRewardPerTokenPaid;
+    /// @notice Ease rewards stored for bribing gvEASE
     mapping(address => uint256) public rewards;
 
+    /// @notice total gvEASE deposited to bribe pot
     uint256 private _totalSupply;
+    /// @notice user balance of gvEASE deposited to bribe pot
     mapping(address => uint256) private _balances;
 
     /* ========== CONSTRUCTOR ========== */
@@ -67,10 +70,6 @@ contract BribePot {
         return _balances[account];
     }
 
-    // how to update this? :thinking: so that lastTime reward applicabel
-    // will always be correct even if we call from outside the contract?
-    // because period finish
-    // can I check and update period finish if new bribe is submitted?
     function lastTimeRewardApplicable() public view returns (uint256) {
         return block.timestamp < periodFinish ? block.timestamp : periodFinish;
     }
@@ -114,6 +113,9 @@ contract BribePot {
         }
     }
 
+    /// @notice amount of EASE token earned for bribing gvEASE
+    /// @param account address of a user to get earned rewards
+    /// @return amount of reward owed to the user
     function earned(address account) public view returns (uint256) {
         (
             uint256 additionalRewardPerToken,
@@ -228,10 +230,9 @@ contract BribePot {
         emit BribeAdded(briber, vault, bribeRate, startWeek, endWeek);
     }
 
+    /// @notice Allows user to cancel existing bribe if it seems unprofitable.
+    /// Transfers remaining EASE amount to the briber by rounding to end of current week
     function cancelBribe(address vault) external {
-        // TODO: test what happens if the user doesn't add a new vault?
-
-        // if bribe seems expensive user can stop streaming
         address briber = msg.sender;
         BribeDetail memory userBribe = bribes[briber][vault];
         delete bribes[briber][vault];
@@ -355,7 +356,7 @@ contract BribePot {
             currBribePerWeek
         );
 
-        // should be updated after updating rewards
+        // should be updated after calculating _rewardPerToken()
         lastRewardUpdate = lastTimeRewardApplicable();
 
         if (account != address(0)) {
