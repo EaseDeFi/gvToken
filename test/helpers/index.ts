@@ -1,5 +1,9 @@
-import { ethers, Signature } from "ethers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { BigNumber, ethers, Signature } from "ethers";
+import { BribePot, EaseToken } from "../../src/types";
+import { RCA_VAULT } from "../constants";
 import { PermitSigArgs } from "../types";
+import { getTimestamp } from "../utils";
 
 export async function getPermitSignature({
   signer,
@@ -56,4 +60,34 @@ export async function getPermitSignature({
       }
     )
   );
+}
+
+export async function bribeFor(
+  briber: SignerWithAddress,
+  bribePerWeek: BigNumber,
+  bribePot: BribePot,
+  token: EaseToken,
+  numOfWeeks: number
+) {
+  // add bribe to bribe pot
+  const rcaVaultAddress = RCA_VAULT;
+  const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
+  const spender = bribePot.address;
+  const deadline = (await getTimestamp()).add(1000);
+  const { v, r, s } = await getPermitSignature({
+    signer: briber,
+    token,
+    value: totalBribeAmt,
+    deadline,
+    spender,
+  });
+  // add bribe amount to pot
+  await bribePot
+    .connect(briber)
+    .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+      deadline,
+      v,
+      r,
+      s,
+    });
 }

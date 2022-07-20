@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 import { EaseToken__factory } from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
 import { RCA_CONTROLLER, RCA_VAULT } from "./constants";
-import { getPermitSignature } from "./helpers";
+import { bribeFor, getPermitSignature } from "./helpers";
 import { Contracts, Signers } from "./types";
 import { getTimestamp, fastForward, mine, TIME_IN_SECS } from "./utils";
 
@@ -294,25 +294,13 @@ describe("BribePot", function () {
       const bribePerWeek = parseEther("10");
       const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 4;
-      // get signature
-      const value = bribePerWeek.mul(numOfWeeks);
-      const spender = contracts.bribePot.address;
-      const deadline = (await getTimestamp()).add(1000);
-      const { v, r, s } = await getPermitSignature({
-        signer: signers.briber,
-        token: contracts.ease,
-        value,
-        deadline,
-        spender,
-      });
-      await contracts.bribePot
-        .connect(signers.briber)
-        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
-          deadline,
-          v,
-          r,
-          s,
-        });
+      await bribeFor(
+        signers.briber,
+        bribePerWeek,
+        contracts.bribePot,
+        contracts.ease,
+        numOfWeeks
+      );
       // deducting 100 secs because tests running in succession may take few seconds
       await fastForward(TIME_IN_SECS.week - 100);
       await mine();
@@ -324,6 +312,47 @@ describe("BribePot", function () {
       expect(userEaseBalAfter.sub(userEaseBalBefore)).to.equal(
         bribePerWeek.mul(3)
       );
+    });
+    it("should update period finish correctly", async function () {
+      // call deposit
+      const gvAmount = parseEther("100");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+
+      await bribeFor(
+        signers.bob,
+        parseEther("10"),
+        contracts.bribePot,
+        contracts.ease,
+        4
+      );
+      await bribeFor(
+        signers.briber,
+        parseEther("20"),
+        contracts.bribePot,
+        contracts.ease,
+        10
+      );
+
+      let periodFinish = await contracts.bribePot.periodFinish();
+      let expectedPeriodFinish = (await contracts.bribePot.genesis()).add(
+        TIME_IN_SECS.week * 11
+      );
+      expect(periodFinish).to.equal(expectedPeriodFinish);
+      // Move 3 weeks forward
+      await fastForward(TIME_IN_SECS.week * 3);
+      await mine();
+
+      // cancle bribe
+      await contracts.bribePot.connect(signers.briber).cancelBribe(RCA_VAULT);
+
+      periodFinish = await contracts.bribePot.periodFinish();
+      // as signer bob is bribing for 4 week period
+      expectedPeriodFinish = (await contracts.bribePot.genesis()).add(
+        TIME_IN_SECS.week * 5
+      );
+      expect(periodFinish).to.equal(expectedPeriodFinish);
     });
   });
 

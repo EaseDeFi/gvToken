@@ -307,6 +307,7 @@ contract GvToken is IGvToken {
             timestamp,
             false
         );
+        // Ease to gvEASE
         uint256 conversionRate = (((depositBalance + earnedPower) *
             MULTIPLIER) / depositBalance);
         uint256 gvAmountToWithdraw = (amount * conversionRate) / MULTIPLIER;

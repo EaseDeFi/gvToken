@@ -19,8 +19,7 @@ contract BribePot {
     IERC20Permit public immutable rewardsToken;
     IRcaController public immutable rcaController;
     address public gvToken;
-    /// @notice A week period from last week that uses
-    /// bribePerWeek to calculate bribe rate.
+    /// @notice Time upto which bribe rewards are active
     uint256 public periodFinish = 0;
     /// @notice A dynamic total amount of EASE token to bribe whole pot
     uint256 public bribePerWeek = 0;
@@ -257,13 +256,15 @@ contract BribePot {
         // update reward end week if this is the last bribe of
         // the system
         uint256 endTime = (userBribe.endWeek * WEEK) + genesis;
-        if (
-            endTime == periodFinish &&
-            bribeRates[userBribe.endWeek].expireAmt == 0
-        ) {
-            // this means the bribe reward should end when the current
-            // bribe expires i.e start of next week
-            periodFinish = genesis + ((currWeek + 1) * WEEK);
+        if (endTime == periodFinish) {
+            uint256 lastBribeEndWeek = userBribe.endWeek;
+            while (lastBribeEndWeek > currWeek) {
+                if (bribeRates[lastBribeEndWeek].expireAmt != 0) {
+                    periodFinish = genesis + (lastBribeEndWeek * WEEK);
+                    break;
+                }
+                lastBribeEndWeek--;
+            }
         }
 
         emit BribeCanceled(
