@@ -15,4 +15,8 @@ contract EaseToken is SolmateERC20 {
         require(msg.sender == minter, "only minter");
         _mint(_user, _amount);
     }
+
+    function burn(uint256 _amount) external {
+        _burn(msg.sender, _amount);
+    }
 }

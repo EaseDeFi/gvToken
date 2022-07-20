@@ -154,7 +154,6 @@ contract GvToken is IGvToken {
         WithdrawRequest memory currRequest = withdrawRequests[user];
         uint256 length = _deposits[user].length;
         uint256 i = includeWithdrawal ? length : length - currRequest.popCount;
-
         uint256 depositIncluded;
         for (i; i > 0; i--) {
             Deposit memory userDeposit = _deposits[user][i - 1];
@@ -176,6 +175,7 @@ contract GvToken is IGvToken {
         // add amount of max_grow achieved to powerEarned
         if (includeWithdrawal) {
             // add withdrawal amount
+            // TODO: come back here and find if something is messing
             powerEarned +=
                 (depositBalance + currRequest.amount) -
                 depositIncluded;
@@ -230,12 +230,8 @@ contract GvToken is IGvToken {
         require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
         require(depositStart >= genesis, "can't deposit before genesis");
 
-        uint256 rewardAmount;
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
         // collect power for vArmor holders
-        _deposit(user, amount, rewardAmount, depositStart, args, false);
+        _deposit(user, amount, 0, depositStart, args, false);
     }
 
     function _deposit(
@@ -277,42 +273,20 @@ contract GvToken is IGvToken {
     /// @notice Request redemption of gvEASE back to ease
     /// Has a withdrawal delay which will work in 2 parts(request and finalize)
     /// @param amount The amount of tokens in EASE to withdraw
-    /// @param includeBribePot Boolean that will withdraw
     /// gvEASE from bribe pot if true
-    function withdrawRequest(uint256 amount, bool includeBribePot) external {
+    function withdrawRequest(uint256 amount) external {
         address user = msg.sender;
         require(amount <= _totalDeposit[user], "not enough deposit!");
         WithdrawRequest memory currRequest = withdrawRequests[user];
+
+        // withdraw form bribe pot if necessary
+        _withdrawFromPot(user, amount);
 
         uint256 popCount = _updateDepositsAndGetPopCount(
             user,
             amount,
             currRequest
         );
-
-        uint256 timestamp = (block.timestamp / WEEK) * WEEK;
-
-        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(
-            user,
-            timestamp,
-            false
-        );
-        // whether user is willing to withdraw from bribe pot
-        // we will not add reward amount to withdraw if user doesn't
-        // want to withdraw from bribe pot
-        if (includeBribePot && bribedAmount[user] != 0) {
-            uint256 conversionRate = (((depositBalance + earnedPower) *
-                MULTIPLIER) / depositBalance);
-            uint256 amountToWithdrawFromPot = (amount * conversionRate) /
-                MULTIPLIER;
-            if (bribedAmount[user] < amountToWithdrawFromPot) {
-                amountToWithdrawFromPot = bribedAmount[user];
-            }
-            pot.withdraw(user, amountToWithdrawFromPot);
-            // add rewardAmount to withdraw amount
-            currRequest.rewards += uint128(pot.getReward(user));
-            bribedAmount[user] -= amountToWithdrawFromPot;
-        }
 
         _totalDeposit[user] -= amount;
 
@@ -323,6 +297,31 @@ contract GvToken is IGvToken {
         withdrawRequests[user] = currRequest;
 
         emit RedeemRequest(user, amount, endTime);
+    }
+
+    function _withdrawFromPot(address user, uint256 amount) private {
+        uint256 timestamp = (block.timestamp / WEEK) * WEEK;
+
+        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(
+            user,
+            timestamp,
+            false
+        );
+        uint256 conversionRate = (((depositBalance + earnedPower) *
+            MULTIPLIER) / depositBalance);
+        uint256 gvAmountToWithdraw = (amount * conversionRate) / MULTIPLIER;
+        uint256 totalBribed = bribedAmount[user];
+        uint256 gvAmtAvailableForBribe = (depositBalance + earnedPower) -
+            totalBribed;
+        // whether user is willing to withdraw from bribe pot
+        // we will not add reward amount to withdraw if user doesn't
+        // want to withdraw from bribe pot
+        if (totalBribed > 0 && gvAmountToWithdraw > gvAmtAvailableForBribe) {
+            uint256 amtToWithdrawFromPot = gvAmountToWithdraw -
+                gvAmtAvailableForBribe;
+            pot.withdraw(user, amtToWithdrawFromPot);
+            bribedAmount[user] -= amtToWithdrawFromPot;
+        }
     }
 
     function _updateDepositsAndGetPopCount(
@@ -360,7 +359,7 @@ contract GvToken is IGvToken {
         // If there is a remainder we need to update the index at which
         // we broke out of loop and push the withdrawan amount to user
         // _deposits withdraw 100 ease from [75, 30] EASE balance becomes
-        // [5, 70, 75]
+        // [5, 30, 70]
         if (remainder.amount != 0) {
             Deposit memory lastDepositWithdrawan = _deposits[user][i - 1];
             lastDepositWithdrawan.amount -= remainder.amount;
@@ -490,10 +489,6 @@ contract GvToken is IGvToken {
             _deposit(user, 0, rewardAmount, block.timestamp, args, true);
         }
 
-        _withdrawFromPot(msg.sender, amount);
-    }
-
-    function _withdrawFromPot(address user, uint256 amount) private {
         bribedAmount[user] -= amount;
         pot.withdraw(user, amount);
     }

@@ -141,8 +141,8 @@ contract BribePot {
         require(amount > 0, "Cannot stake 0");
         // update reward rates and bribes
         _update(from);
-        _totalSupply = _totalSupply + amount;
-        _balances[from] = _balances[from] + amount;
+        _totalSupply += amount;
+        _balances[from] += amount;
         emit Deposited(from, amount);
     }
 
