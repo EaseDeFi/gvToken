@@ -208,12 +208,7 @@ contract GvToken is IGvToken {
     /* ========== DEPOSIT IMPL ========== */
 
     function deposit(uint256 amount, PermitArgs memory args) external {
-        address user = msg.sender;
-        uint256 rewardAmount;
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        _deposit(user, amount, rewardAmount, block.timestamp, args, false);
+        _deposit(msg.sender, amount, block.timestamp, args, false);
     }
 
     /// @notice Deposit for vArmor holders to give them
@@ -231,19 +226,18 @@ contract GvToken is IGvToken {
         require(depositStart >= genesis, "can't deposit before genesis");
 
         // collect power for vArmor holders
-        _deposit(user, amount, 0, depositStart, args, false);
+        _deposit(user, amount, depositStart, args, false);
     }
 
     function _deposit(
         address user,
         uint256 amount,
-        uint256 rewardAmount,
         uint256 depositStart,
         PermitArgs memory args,
         bool fromBribePot
     ) private {
         Deposit memory newDeposit = Deposit(
-            uint128(amount + rewardAmount),
+            uint128(amount),
             uint32(depositStart)
         );
 
@@ -404,16 +398,6 @@ contract GvToken is IGvToken {
     function stake(uint256 balancePercent, address vault) external {
         require(rcaController.activeShields(vault), "vault not active");
         address user = msg.sender;
-        // deposit reward
-        PermitArgs memory args;
-        // TODO: should we limit this deposit call monthly?
-        uint256 rewardAmount;
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        if (rewardAmount != 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
-        }
 
         uint256 totalStake = _totalStaked[user];
         totalStake += balancePercent;
@@ -432,17 +416,6 @@ contract GvToken is IGvToken {
     /// @param vault RCA-vault address
     function unStake(uint256 balancePercent, address vault) external {
         address user = msg.sender;
-        // deposit reward
-        PermitArgs memory args;
-        // TODO: should we limit this deposit call monthly?
-        uint256 rewardAmount;
-        // collect rewards and add to user _deposits to gain more gvToken
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        if (rewardAmount != 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
-        }
 
         _stakes[vault][user] -= balancePercent;
         _totalStaked[user] -= balancePercent;
@@ -478,33 +451,28 @@ contract GvToken is IGvToken {
     /// pot and collects earned rewards
     function withdrawFromPot(uint256 amount) external {
         // withdraws user gvToken from bribe pot
-        address user = msg.sender;
-        PermitArgs memory args;
-        uint256 rewardAmount;
-        // claim reward from the bribe pot
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        // deposit reward to increase user's gvEASE
-        if (rewardAmount != 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
-        }
+        bribedAmount[msg.sender] -= amount;
+        pot.withdraw(msg.sender, amount);
+    }
 
-        bribedAmount[user] -= amount;
-        pot.withdraw(user, amount);
+    ///@notice Allows user to claim rewards
+    function claimReward() external {
+        pot.getReward(msg.sender, true);
     }
 
     /// @notice Allows account to claim rewards from Bribe pot and deposit
     /// to gain more gvEASE
     function claimAndDepositReward() external {
         address user = msg.sender;
-        uint256 rewardAmount;
+        // bribe rewards from the pot
+        uint256 amount;
+
         PermitArgs memory args;
         if (bribedAmount[user] > 0) {
-            rewardAmount = pot.getReward(user);
+            amount = pot.getReward(user, false);
         }
-        if (rewardAmount > 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
+        if (amount > 0) {
+            _deposit(user, amount, block.timestamp, args, true);
         }
     }
 

@@ -13,6 +13,7 @@ import { getPermitSignature } from "./helpers";
 import BalanceTree from "./helpers/balance-tree";
 import { Contracts, Signers } from "./types";
 import { fastForward, getTimestamp, mine, TIME_IN_SECS } from "./utils";
+const MAX_PERCENT = 100_000;
 
 describe("GvToken", function () {
   const contracts = {} as Contracts;
@@ -109,10 +110,13 @@ describe("GvToken", function () {
       });
   }
 
-  async function bribeFor(briber: SignerWithAddress, bribePerWeek: BigNumber) {
+  async function bribeFor(
+    briber: SignerWithAddress,
+    bribePerWeek: BigNumber,
+    numOfWeeks: number
+  ) {
     // add bribe to bribe pot
     const rcaVaultAddress = RCA_VAULT;
-    const numOfWeeks = 2;
     const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
     const spender = contracts.bribePot.address;
     const deadline = (await getTimestamp()).add(1000);
@@ -355,44 +359,8 @@ describe("GvToken", function () {
       ).sub(userWithdrawRequest.popCount);
       expect(deposits.length).to.equal(BigNumber.from(expectedDepositsLength));
     });
-
-    it("should add rewards of bribed amount on multiple deposit", async function () {
-      const value = parseEther("1000");
-      // deposit
-      await depositFor(signers.bob, value);
-
-      // deposit to bribePot
-      await contracts.gvToken.connect(signers.bob).depositToPot(value);
-
-      // bribe the pot
-      const bribePerWeek = parseEther("50");
-      await bribeFor(signers.briber, bribePerWeek);
-
-      // fast forward few weeks
-      const genesisPot = await contracts.bribePot.genesis();
-      const timeNeededToReachWeek1 = genesisPot
-        .add(TIME_IN_SECS.week)
-        .sub(await getTimestamp());
-
-      // fast forward inbetween week2 and week3
-      await fastForward(
-        timeNeededToReachWeek1.add(TIME_IN_SECS.week).toNumber()
-      );
-      await mine();
-
-      // call deposit again
-      const newDepositValue = parseEther("1001");
-      await depositFor(signers.bob, newDepositValue);
-
-      const deposits = await contracts.gvToken.getUserDeposits(
-        signers.bob.address
-      );
-
-      const lastDeposit = deposits[deposits.length - 1];
-
-      expect(lastDeposit.amount.sub(newDepositValue)).to.gte(bribePerWeek);
-    });
   });
+
   describe("stake()", function () {
     const stkPercent = BigNumber.from(10000);
     beforeEach(async function () {
@@ -467,43 +435,16 @@ describe("GvToken", function () {
     it("should revert if inactive vault is passed", async function () {
       const inactiveVault = signers.otherAccounts[0].address;
       await expect(
-        contracts.gvToken
-          .connect(signers.user)
-          .stake(stkPercent.mul(11), inactiveVault)
+        contracts.gvToken.connect(signers.user).stake(stkPercent, inactiveVault)
       ).to.revertedWith("vault not active");
-      // work
-    });
-    it("should collect rewards on behalf of the staker from bribePot", async function () {
-      // work
-      const depositsBeforeStake = await contracts.gvToken.getUserDeposits(
-        userAddress
-      );
-
-      await contracts.gvToken
-        .connect(signers.user)
-        .stake(stkPercent, RCA_VAULT);
-
-      const depositsAfterStake = await contracts.gvToken.getUserDeposits(
-        userAddress
-      );
-      // collected rewards should be deposited to gvToken
-      expect(depositsAfterStake.length - depositsBeforeStake.length).to.equal(
-        1
-      );
-      const rewardsAmount =
-        depositsAfterStake[depositsAfterStake.length - 1].amount;
-
-      // as user's share in bribe pot is 33% expected rewards
-      // at 10EASE pre week of bribe equals around 3.33 EASE
-      const expectedRewards = parseEther("3.33");
-      expect(rewardsAmount).to.gte(expectedRewards);
     });
   });
   describe("unstake()", function () {
     const stkPercent = BigNumber.from(10000);
+    const value = parseEther("100");
+    const userBribedAmt = value.mul(5).div(10);
     beforeEach(async function () {
       // deposit
-      const value = parseEther("100");
       // deposit bob
       await depositFor(signers.bob, value);
 
@@ -517,9 +458,7 @@ describe("GvToken", function () {
 
       // deposit to pot
       // add 50 gvEase from user to bribe pot
-      await contracts.gvToken
-        .connect(signers.user)
-        .depositToPot(value.mul(5).div(10));
+      await contracts.gvToken.connect(signers.user).depositToPot(userBribedAmt);
       // add 100 gvEase from bob to bribe pot
       await contracts.gvToken.connect(signers.bob).depositToPot(value);
 
@@ -558,26 +497,6 @@ describe("GvToken", function () {
       );
       await mine();
     });
-    it("should collect rewards from bribe pot", async function () {
-      // unstake to see if rewards has been collected
-      const depositsBefore = await contracts.gvToken.getUserDeposits(
-        userAddress
-      );
-      await contracts.gvToken
-        .connect(signers.user)
-        .unStake(stkPercent, RCA_VAULT);
-      const depositsAfter = await contracts.gvToken.getUserDeposits(
-        userAddress
-      );
-      expect(depositsAfter.length - depositsBefore.length).to.equal(1);
-      // total deposited from pot
-      const rewardAmount = depositsAfter[depositsAfter.length - 1].amount;
-
-      // reward amount for a week of bribe would be more than 3 as user
-      // share in bribePot is around 33% and bribe per week is 10EASE
-      const expectedRewardAmount = parseEther("3.33");
-      expect(rewardAmount).to.gte(expectedRewardAmount);
-    });
     it("should emit UnStake event", async function () {
       // call unstake to emit
       expect(
@@ -597,6 +516,55 @@ describe("GvToken", function () {
           .unStake(stkPercent, inactiveVault)
       ).to.reverted;
     });
+    describe("powerStaked()", function () {
+      it("should update the powerStaked of a user", async function () {
+        const powerStakedBefore = await contracts.gvToken.powerStaked(
+          userAddress,
+          RCA_VAULT
+        );
+
+        await contracts.gvToken
+          .connect(signers.user)
+          .unStake(stkPercent, RCA_VAULT);
+        const powerStakedAfter = await contracts.gvToken.powerStaked(
+          userAddress,
+          RCA_VAULT
+        );
+        // this sould come out as 5gvEASE
+        const expectedPowerStakedIncrease = stkPercent
+          .mul(value.sub(userBribedAmt))
+          .div(MAX_PERCENT);
+
+        // as we have bribed 50gvEase of a user to bribePot and we have
+        // forwarded time by a week, user's actual gvEASE balance at this
+        // time is slightly more than 101 gvEASE. So staking 10% to some RCA_VAULT
+        // here means staking 10% of (101 - 50)gvEASE which equals to 5.1 gvEASE
+        // so we are expecting stakedPower difference to be more than 5gvEASe
+        expect(powerStakedBefore.sub(powerStakedAfter)).to.gt(
+          expectedPowerStakedIncrease
+        );
+
+        // as we are unstaking everything form the vault powerStakedAfter should
+        // be zero
+        expect(powerStakedAfter).to.equal(0);
+      });
+    });
+    describe("powerAvailableForStake()", function () {
+      it("should return correct power available for stake", async function () {
+        const userBalance = await contracts.gvToken.balanceOf(userAddress);
+        const stakedToRcaVault = await contracts.gvToken.powerStaked(
+          userAddress,
+          RCA_VAULT
+        );
+        const expectedPowerAvailableForStake = userBalance
+          .sub(userBribedAmt)
+          .sub(stakedToRcaVault);
+        const powerAvailableForStake =
+          await contracts.gvToken.powerAvailableForStake(userAddress);
+
+        expect(powerAvailableForStake).to.equal(expectedPowerAvailableForStake);
+      });
+    });
   });
   describe("withdrawRequest()", function () {
     const userBribeAmount = parseEther("50");
@@ -615,7 +583,7 @@ describe("GvToken", function () {
         .depositToPot(userBribeAmount);
       // add 100 gvEase from bob to bribe pot
       await contracts.gvToken.connect(signers.bob).depositToPot(value);
-      await bribeFor(signers.briber, parseEther("10"));
+      await bribeFor(signers.briber, parseEther("10"), 2);
 
       // forward beyond 2nd week
       const genesis = await contracts.bribePot.genesis();
@@ -703,7 +671,7 @@ describe("GvToken", function () {
         .depositToPot(value.mul(5).div(10));
       // add 100 gvEase from bob to bribe pot
       await contracts.gvToken.connect(signers.bob).depositToPot(value);
-      await bribeFor(signers.briber, parseEther("10"));
+      await bribeFor(signers.briber, parseEther("10"), 2);
 
       // forward beyond 2nd week
       const genesis = await contracts.bribePot.genesis();
@@ -749,6 +717,73 @@ describe("GvToken", function () {
       await expect(contracts.gvToken.connect(signers.user).withdrawFinalize())
         .to.emit(contracts.gvToken, "RedeemFinalize")
         .withArgs(userAddress, amount);
+    });
+  });
+  describe("claimReward()", function () {
+    const depositAmt = parseEther("100");
+    const bribePerWeek = parseEther("5");
+    beforeEach(async function () {
+      // deposit for user
+      await depositFor(signers.user, depositAmt);
+
+      await contracts.gvToken
+        .connect(signers.user)
+        .depositToPot(depositAmt.div(2));
+
+      // bribe from vPot
+      const numOfWeeks = 4;
+      await bribeFor(signers.briber, bribePerWeek, numOfWeeks);
+
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+    });
+    it("should transfer reward amount to the user's wallet", async function () {
+      const userBalanceBefore = await contracts.ease.balanceOf(userAddress);
+      await contracts.gvToken.connect(signers.user).claimReward();
+      const userBalanceAfter = await contracts.ease.balanceOf(userAddress);
+      // as we are fast forward into week 2 rewards earned by user through
+      // bribe has been active for > 1 weeks and < 2 weeks. That means if
+      // user is the only briber he should get reward more than 5EASE but
+      // less than 10EASE
+      expect(userBalanceAfter.sub(userBalanceBefore)).to.gt(parseEther("5"));
+      expect(userBalanceAfter.sub(userBalanceBefore)).to.lt(parseEther("10"));
+    });
+  });
+  describe("claimAndDepositReward()", function () {
+    beforeEach(async function () {
+      // deposit for user
+      const depositAmt = parseEther("100");
+      await depositFor(signers.user, depositAmt);
+
+      await contracts.gvToken
+        .connect(signers.user)
+        .depositToPot(depositAmt.div(2));
+
+      // bribe from vPot
+      const bribePerWeek = parseEther("5");
+      const numOfWeeks = 4;
+      await bribeFor(signers.briber, bribePerWeek, numOfWeeks);
+
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+    });
+    it("should claim reward and deposit for gvEASE", async function () {
+      // complete this
+      const depositsBefore = await contracts.gvToken.getUserDeposits(
+        userAddress
+      );
+      const balanceBefore = await contracts.gvToken.balanceOf(userAddress);
+      await contracts.gvToken.connect(signers.user).claimAndDepositReward();
+      const depositsAfter = await contracts.gvToken.getUserDeposits(
+        userAddress
+      );
+      const balanceAfter = await contracts.gvToken.balanceOf(userAddress);
+      // should add reward EASE amount to deposits array of the user
+      expect(depositsAfter.length - depositsBefore.length).to.equal(1);
+
+      // as current time is between 2nd week and third week reward amount should
+      // be greater than bribe per week (i.e 5EASE/week)
+      expect(balanceAfter.sub(balanceBefore)).to.gt(parseEther("5"));
     });
   });
   describe("delegate()", function () {

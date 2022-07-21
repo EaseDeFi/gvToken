@@ -157,7 +157,7 @@ contract BribePot {
         emit Withdrawn(from, amount);
     }
 
-    function getReward(address user)
+    function getReward(address user, bool toUser)
         public
         onlyGvToken(msg.sender)
         returns (uint256)
@@ -167,7 +167,11 @@ contract BribePot {
         uint256 reward = rewards[user];
         if (reward > 0) {
             rewards[user] = 0;
-            rewardsToken.safeTransfer(gvToken, reward);
+
+            // if user wants to reDeposit transfer to gvToken else
+            // transfer to user's wallet
+            user = toUser ? user : gvToken;
+            rewardsToken.safeTransfer(user, reward);
             emit RewardPaid(user, reward);
         }
         return reward;
@@ -310,7 +314,6 @@ contract BribePot {
                 if (rewardedUpto != 0) {
                     // this means that user deposited or withdrew funds in between week
                     // we need to update ratePerTokenStored
-                    // TODO: WHAT IF TOTAL SUPPLY IS ZERO?
                     addRewardPerToken +=
                         (((currentBribePerWeek * MULTIPLIER) / WEEK) *
                             (WEEK - rewardedUpto)) /

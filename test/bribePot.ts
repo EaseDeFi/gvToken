@@ -79,7 +79,7 @@ describe("BribePot", function () {
           .withdraw(aliceAddress, parseEther("100"))
       ).to.revertedWith("only gvToken");
       await expect(
-        contracts.bribePot.connect(signers.bob).getReward(aliceAddress)
+        contracts.bribePot.connect(signers.bob).getReward(aliceAddress, false)
       ).to.revertedWith("only gvToken");
     });
   });
@@ -150,7 +150,6 @@ describe("BribePot", function () {
         .deposit(bobAddress, gvAmount);
 
       const rewardPerToken = await contracts.bribePot.rewardPerToken();
-
       expect(rewardPerToken).to.gte(parseEther("0.1"));
 
       // fast forward 4 days
@@ -169,7 +168,9 @@ describe("BribePot", function () {
         signers.gvToken.address
       );
 
-      await contracts.bribePot.connect(signers.gvToken).getReward(bobAddress);
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .getReward(bobAddress, false);
       const balanceAfter = await contracts.ease.balanceOf(
         signers.gvToken.address
       );
@@ -395,7 +396,9 @@ describe("BribePot", function () {
         .connect(signers.gvToken)
         .withdraw(aliceAddress, gvAmount);
 
-      await contracts.bribePot.connect(signers.gvToken).getReward(aliceAddress);
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .getReward(aliceAddress, false);
 
       const balanceAfter = await contracts.ease.balanceOf(
         signers.gvToken.address
@@ -643,7 +646,7 @@ describe("BribePot", function () {
       expect(earned).to.gte(parseEther("11"));
 
       // call get reward function
-      await contracts.bribePot.getReward(bobAddress);
+      await contracts.bribePot.getReward(bobAddress, false);
 
       // check last reward update should be equal to timestamp
       const lastRewardUpdate = await contracts.bribePot.lastRewardUpdate();
@@ -667,6 +670,7 @@ describe("BribePot", function () {
       const bobRewardsToClaim = await contracts.bribePot.rewards(bobAddress);
       expect(bobRewardsToClaim).to.equal(0);
     });
+
     it("should collect rewards to gvToken address", async function () {
       // fast forward 2nd day of week2
       await fastForward(TIME_IN_SECS.week + TIME_IN_SECS.day * 2);
@@ -677,13 +681,26 @@ describe("BribePot", function () {
       );
 
       // call get reward function
-      await contracts.bribePot.getReward(bobAddress);
+      await contracts.bribePot.getReward(bobAddress, false);
       const gvTokenEaseBalanceAfter = await contracts.ease.balanceOf(
         signers.gvToken.address
       );
       expect(gvTokenEaseBalanceAfter.sub(gvTokenEaseBalanceBefore)).to.gte(
         parseEther("11")
       );
+    });
+
+    it("should collect rewards to the user address", async function () {
+      // fast forward 2nd day of week2
+      await fastForward(TIME_IN_SECS.week + TIME_IN_SECS.day * 2);
+      await mine();
+
+      const bobEaseBalBefore = await contracts.ease.balanceOf(bobAddress);
+
+      // call get reward function
+      await contracts.bribePot.getReward(bobAddress, true);
+      const bobEaseBalAfter = await contracts.ease.balanceOf(bobAddress);
+      expect(bobEaseBalAfter.sub(bobEaseBalBefore)).to.gte(parseEther("11"));
     });
   });
 });

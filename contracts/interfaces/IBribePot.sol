@@ -8,7 +8,7 @@ interface IBribePot {
 
     function exit(address user) external;
 
-    function getReward(address user) external returns (uint256);
+    function getReward(address user, bool toUser) external returns (uint256);
 
     function earned(address user) external view returns (uint256);
 
