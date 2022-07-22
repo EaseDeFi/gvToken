@@ -772,16 +772,31 @@ describe("GvToken", function () {
       await mine();
     });
     it("should claim reward and deposit for gvEASE", async function () {
-      // complete this
+      const gvTokenEaseBalBefore = await contracts.ease.balanceOf(
+        contracts.gvToken.address
+      );
       const depositsBefore = await contracts.gvToken.getUserDeposits(
         userAddress
       );
       const balanceBefore = await contracts.gvToken.balanceOf(userAddress);
       await contracts.gvToken.connect(signers.user).claimAndDepositReward();
+
+      const gvTokenEaseBalAfter = await contracts.ease.balanceOf(
+        contracts.gvToken.address
+      );
       const depositsAfter = await contracts.gvToken.getUserDeposits(
         userAddress
       );
       const balanceAfter = await contracts.gvToken.balanceOf(userAddress);
+
+      // With bribe rate being @5EASE/week and we are at week 2 reward
+      // collected by user should be more than 5EASE but less than 10EASE
+      expect(gvTokenEaseBalAfter.sub(gvTokenEaseBalBefore)).to.gt(
+        parseEther("5")
+      );
+      expect(gvTokenEaseBalAfter.sub(gvTokenEaseBalBefore)).to.lt(
+        parseEther("10")
+      );
       // should add reward EASE amount to deposits array of the user
       expect(depositsAfter.length - depositsBefore.length).to.equal(1);
 
