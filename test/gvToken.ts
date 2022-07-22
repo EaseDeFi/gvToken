@@ -147,6 +147,11 @@ describe("GvToken", function () {
   });
 
   describe("deposit()", function () {
+    it("should not allow to deposit 0EASE", async function () {
+      await expect(depositFor(signers.user, parseEther("0"))).to.revertedWith(
+        "cannot deposit 0!"
+      );
+    });
     it("should deposit ease and recieve gv Power", async function () {
       const value = parseEther("100");
       const deadline = (await getTimestamp()).add(1000);
@@ -245,7 +250,7 @@ describe("GvToken", function () {
         .withArgs(bobAddress, bobValue);
 
       const bobGvBal = await contracts.gvToken.balanceOf(bobAddress);
-      // TODO: calculate expected bob extra power
+
       expect(bobGvBal).to.gt(bobValue.add(parseEther("10")));
 
       // Alice Deposit
@@ -318,46 +323,46 @@ describe("GvToken", function () {
       // without any bribes
 
       // first withdraw request
+      const withdrawAmt1 = parseEther("400");
       await contracts.gvToken
         .connect(signers.user)
-        .withdrawRequest(parseEther("400"));
+        .withdrawRequest(withdrawAmt1);
 
-      const popCount1 = (await contracts.gvToken.withdrawRequests(userAddress))
-        .popCount;
-      // we have deposits of 10Ease every batch withdraw request
-      // of 400EASE results in 40 deposit elements
-      expect(popCount1).to.equal(40);
+      let withdrawRequest = await contracts.gvToken.withdrawRequests(
+        userAddress
+      );
+
+      expect(withdrawRequest.amount).to.equal(withdrawAmt1);
 
       let currentDepositCount = (
         await contracts.gvToken.getUserDeposits(userAddress)
       ).length;
+      // current deposit count should be 10 because we are withdrawing 400EASE
+      // which means 40 deposits of 10EASE each will be poped off on withdraw
+      // request
+      expect(currentDepositCount).to.equal(10);
 
-      expect(currentDepositCount).to.equal(initialDepositCount);
-
+      // call withdraw request 2nd time
+      const withdrawAmt2 = parseEther("3");
       await contracts.gvToken
         .connect(signers.user)
-        .withdrawRequest(parseEther("3"));
+        .withdrawRequest(withdrawAmt2);
 
       currentDepositCount = (
         await contracts.gvToken.getUserDeposits(userAddress)
       ).length;
 
-      const userWithdrawRequest = await contracts.gvToken.withdrawRequests(
-        userAddress
-      );
+      withdrawRequest = await contracts.gvToken.withdrawRequests(userAddress);
 
-      expect(userWithdrawRequest.popCount).to.equal(40 + 1);
+      expect(withdrawRequest.amount).to.equal(withdrawAmt1.add(withdrawAmt2));
 
-      const depositsBeforeWithdraw = await contracts.gvToken.getUserDeposits(
-        userAddress
-      );
       await fastForward(TIME_IN_SECS.month);
+      const balanceBefore = await contracts.ease.balanceOf(userAddress);
       await contracts.gvToken.connect(signers.user).withdrawFinalize();
-      const deposits = await contracts.gvToken.getUserDeposits(userAddress);
-      const expectedDepositsLength = BigNumber.from(
-        depositsBeforeWithdraw.length
-      ).sub(userWithdrawRequest.popCount);
-      expect(deposits.length).to.equal(BigNumber.from(expectedDepositsLength));
+      const balanceAfter = await contracts.ease.balanceOf(userAddress);
+      expect(balanceAfter.sub(balanceBefore)).to.equal(
+        withdrawAmt1.add(withdrawAmt2)
+      );
     });
   });
 
@@ -634,7 +639,6 @@ describe("GvToken", function () {
       const firstEndTime = (await getTimestamp()).add(TIME_IN_SECS.week * 2);
       expect(withdrawRequest.amount).to.equal(firstWithdrawAmt);
       expect(withdrawRequest.endTime).to.equal(firstEndTime);
-      expect(withdrawRequest.popCount).to.equal(1);
       // move forward
       await fastForward(TIME_IN_SECS.week);
       await mine();

@@ -125,10 +125,7 @@ contract BribePot {
             additionalRewardPerToken,
             currBribePerWeek
         );
-        return
-            ((_balances[account] *
-                (currRewardPerToken - (userRewardPerTokenPaid[account]))) /
-                (MULTIPLIER)) + rewards[account];
+        return _earned(account, currRewardPerToken);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
@@ -146,7 +143,7 @@ contract BribePot {
     }
 
     function withdraw(address from, uint256 amount)
-        public
+        external
         onlyGvToken(msg.sender)
     {
         require(amount > 0, "Cannot withdraw 0");
@@ -157,8 +154,11 @@ contract BribePot {
         emit Withdrawn(from, amount);
     }
 
+    ///@notice Transfers rewards amount to the desired user
+    ///@param user address of gvEase depositor
+    ///@param toUser boolean to identify whom to transfer (gvEASE contract/user)
     function getReward(address user, bool toUser)
-        public
+        external
         onlyGvToken(msg.sender)
         returns (uint256)
     {
@@ -178,14 +178,18 @@ contract BribePot {
     }
 
     /* ========== BRIBE LOGIC ========== */
-
+    ///@notice Adds bribes per week to venal pot and recieve percentage
+    /// share of the venal pot depending on share of the bribe the briber
+    /// is paying per week. Bribe will activate starting next week.
+    ///@param bribeRate EASE per week for percentage share of bribe pot
+    ///@param vault Rca-vault address to bribe gvEASE for
+    ///@param numOfWeeks Number of weeks to bribe with the current rate
     function bribe(
         uint256 bribeRate,
         address vault,
         uint256 numOfWeeks, // Total weeks to bribe
         PermitArgs memory permit
     ) external {
-        // TODO: do I wanna keep this check at all?
         require(_totalSupply > 0, "nothing to bribe");
 
         require(rcaController.activeShields(vault), "inactive vault");
@@ -235,6 +239,7 @@ contract BribePot {
 
     /// @notice Allows user to cancel existing bribe if it seems unprofitable.
     /// Transfers remaining EASE amount to the briber by rounding to end of current week
+    /// @param vault Rca-vault address to cancel bribe for
     function cancelBribe(address vault) external {
         address briber = msg.sender;
         BribeDetail memory userBribe = bribes[briber][vault];
@@ -281,6 +286,7 @@ contract BribePot {
     }
 
     /* ========== PRIVATE ========== */
+
     function getCurrWeek() private view returns (uint256) {
         return ((block.timestamp - genesis) / WEEK);
     }
@@ -343,7 +349,16 @@ contract BribePot {
         }
     }
 
-    /* ========== MODIFIERS ========== */
+    function _earned(address account, uint256 currRewardPerToken)
+        private
+        view
+        returns (uint256)
+    {
+        return
+            ((_balances[account] *
+                (currRewardPerToken - (userRewardPerTokenPaid[account]))) /
+                (MULTIPLIER)) + rewards[account];
+    }
 
     function _update(address account) private {
         (
@@ -364,10 +379,12 @@ contract BribePot {
         lastRewardUpdate = lastTimeRewardApplicable();
 
         if (account != address(0)) {
-            rewards[account] = earned(account);
+            rewards[account] = _earned(account, rewardPerTokenStored);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
     }
+
+    /* ========== MODIFIERS ========== */
 
     modifier onlyGvToken(address caller) {
         require(caller == gvToken, "only gvToken");

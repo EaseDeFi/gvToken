@@ -83,11 +83,7 @@ contract GvToken is IGvToken {
         view
         returns (uint256)
     {
-        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
+        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(user);
         uint256 bribed = bribedAmount[user];
         return
             (_stakes[vault][user] *
@@ -99,11 +95,7 @@ contract GvToken is IGvToken {
         view
         returns (uint256)
     {
-        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
+        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(user);
         uint256 bribed = bribedAmount[user];
         uint256 totalStaked = (_totalStaked[user] *
             ((depositedAmount + powerEarned) - bribed)) / MAX_PERCENT;
@@ -112,25 +104,8 @@ contract GvToken is IGvToken {
     }
 
     function balanceOf(address user) public view returns (uint256) {
-        (uint256 depositAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
+        (uint256 depositAmount, uint256 powerEarned) = _balanceOf(user);
 
-        return depositAmount + powerEarned;
-    }
-
-    function balanceOfAt(address user, uint256 timestamp)
-        external
-        view
-        returns (uint256)
-    {
-        (uint256 depositAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            timestamp,
-            true
-        );
         return depositAmount + powerEarned;
     }
 
@@ -144,26 +119,20 @@ contract GvToken is IGvToken {
 
     /* ========== ACCOUNTING ========== */
 
-    function _balanceOf(
-        address user,
-        uint256 timestamp,
-        bool includeWithdrawal
-    ) private view returns (uint256 depositBalance, uint256 powerEarned) {
+    function _balanceOf(address user)
+        private
+        view
+        returns (uint256 depositBalance, uint256 powerEarned)
+    {
+        uint256 timestamp = block.timestamp;
         depositBalance = _totalDeposit[user];
 
-        WithdrawRequest memory currRequest = withdrawRequests[user];
-        uint256 length = _deposits[user].length;
-        uint256 i = includeWithdrawal ? length : length - currRequest.popCount;
+        uint256 i = _deposits[user].length;
         uint256 depositIncluded;
         for (i; i > 0; i--) {
             Deposit memory userDeposit = _deposits[user][i - 1];
 
-            // if timestamp is < userDeposit.start?
-            // meaning that deposit should not be included
-            if (timestamp < userDeposit.start) {
-                depositBalance -= userDeposit.amount;
-                continue;
-            } else if (timestamp - userDeposit.start > MAX_GROW) {
+            if ((timestamp - userDeposit.start) > MAX_GROW) {
                 // if we reach here that means we have max_grow
                 // has been achieved for earlier deposits
                 break;
@@ -172,16 +141,7 @@ contract GvToken is IGvToken {
             depositIncluded += userDeposit.amount;
             powerEarned += _powerEarned(userDeposit, timestamp);
         }
-        // add amount of max_grow achieved to powerEarned
-        if (includeWithdrawal) {
-            // add withdrawal amount
-            // TODO: come back here and find if something is messing
-            powerEarned +=
-                (depositBalance + currRequest.amount) -
-                depositIncluded;
-        } else {
-            powerEarned += (depositBalance - depositIncluded);
-        }
+        powerEarned += (depositBalance - depositIncluded);
     }
 
     function _powerEarned(Deposit memory userDeposit, uint256 timestamp)
@@ -236,6 +196,7 @@ contract GvToken is IGvToken {
         PermitArgs memory args,
         bool fromBribePot
     ) private {
+        require(amount > 0, "cannot deposit 0!");
         Deposit memory newDeposit = Deposit(
             uint128(amount),
             uint32(depositStart)
@@ -276,31 +237,22 @@ contract GvToken is IGvToken {
         // withdraw form bribe pot if necessary
         _withdrawFromPot(user, amount);
 
-        uint256 popCount = _updateDepositsAndGetPopCount(
-            user,
-            amount,
-            currRequest
-        );
+        _updateDeposits(user, amount);
 
         _totalDeposit[user] -= amount;
 
         uint256 endTime = block.timestamp + withdrawalDelay;
         currRequest.endTime = uint32(endTime);
         currRequest.amount += uint128(amount);
-        currRequest.popCount += uint16(popCount);
         withdrawRequests[user] = currRequest;
 
         emit RedeemRequest(user, amount, endTime);
     }
 
+    ///@notice Withraw from bribe pot if withdraw amount of gvEASE exceeds
+    ///(gvEase balance - bribed amount)
     function _withdrawFromPot(address user, uint256 amount) private {
-        uint256 timestamp = (block.timestamp / WEEK) * WEEK;
-
-        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(
-            user,
-            timestamp,
-            false
-        );
+        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(user);
         // Ease to gvEASE
         uint256 conversionRate = (((depositBalance + earnedPower) *
             MULTIPLIER) / depositBalance);
@@ -319,50 +271,40 @@ contract GvToken is IGvToken {
         }
     }
 
-    function _updateDepositsAndGetPopCount(
-        address user,
-        uint256 withDrawAmount,
-        WithdrawRequest memory currRequest
-    ) private returns (uint256) {
-        //
+    ///@notice Loops through deposits of user from last index and pop's off the
+    ///ones that are included in withdraw amount
+    function _updateDeposits(address user, uint256 withDrawAmount) private {
         Deposit memory remainder;
         uint256 totalAmount;
         // current deposit details
         Deposit memory userDeposit;
-        // index to loop from
-        uint256 startIndex = _deposits[user].length;
 
-        startIndex = currRequest.amount > 0
-            ? (startIndex - currRequest.popCount)
-            : startIndex;
-        uint256 i = startIndex;
+        // index to loop from
+        uint256 i = _deposits[user].length;
         for (i; i > 0; i--) {
             userDeposit = _deposits[user][i - 1];
             totalAmount += userDeposit.amount;
+            // remove last deposit
+            _deposits[user].pop();
+
             // Let's say user tries to withdraw 100 EASE and they have
             // multiple ease deposits [75, 30] EASE when our loop is
             // at index 0 total amount will be 105, that means we need
-            // to store the remainder and replace that index later
+            // to push the remainder to deposits array
             if (totalAmount >= withDrawAmount) {
                 remainder.amount = uint128(totalAmount - withDrawAmount);
                 remainder.start = userDeposit.start;
                 break;
             }
-            _deposits[user][i - 1] = userDeposit;
         }
 
         // If there is a remainder we need to update the index at which
         // we broke out of loop and push the withdrawan amount to user
         // _deposits withdraw 100 ease from [75, 30] EASE balance becomes
-        // [5, 30, 70]
+        // [5]
         if (remainder.amount != 0) {
-            Deposit memory lastDepositWithdrawan = _deposits[user][i - 1];
-            lastDepositWithdrawan.amount -= remainder.amount;
-            _deposits[user][i - 1] = remainder;
-            _deposits[user].push(lastDepositWithdrawan);
+            _deposits[user].push(remainder);
         }
-
-        return startIndex - (i - 1);
     }
 
     /// @notice Used to exchange gvEASE back to ease token and transfers
@@ -378,15 +320,8 @@ contract GvToken is IGvToken {
             "withdrawal not yet allowed"
         );
 
-        // pop off the number of deposits that has been withdrawn
-        for (uint256 i = 0; i < userReq.popCount; i++) {
-            _deposits[user].pop();
-        }
+        stakingToken.safeTransfer(user, userReq.amount);
 
-        uint256 amount = userReq.amount + userReq.rewards;
-        stakingToken.safeTransfer(user, amount);
-
-        // TODO: should I care about rewards here?
         emit RedeemFinalize(user, userReq.amount);
     }
 
@@ -432,11 +367,7 @@ contract GvToken is IGvToken {
         // deposits user gvEase to bribe pot and
         // get rewards against it
         address user = msg.sender;
-        (uint256 amountDeposited, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
+        (uint256 amountDeposited, uint256 powerEarned) = _balanceOf(user);
         uint256 totalPower = amountDeposited + powerEarned;
         uint256 bribed = bribedAmount[user];
 
@@ -732,7 +663,6 @@ contract GvToken is IGvToken {
 
     function setDelay(uint256 time) external onlyGov {
         time = (time / 1 weeks) * 1 weeks;
-        // TODO: what should be minimum delay that even gov can't go under
         require(time > 2 weeks, "min delay 14 days");
         withdrawalDelay = time;
     }
