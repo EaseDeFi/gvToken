@@ -78,6 +78,9 @@ contract GvToken is IGvToken {
     }
 
     /* ========== VIEW FUNCTIONS ========== */
+    ///@notice Calculates amount of gvEASE staked by user to
+    ///specific rca-vault
+    ///@return Amount of gvEASE deposited to specific rca-vault
     function powerStaked(address user, address vault)
         external
         view
@@ -90,6 +93,8 @@ contract GvToken is IGvToken {
                 ((depositedAmount + powerEarned) - bribed)) / MAX_PERCENT;
     }
 
+    ///@notice Calcualtes amount of gvEASE that is available for stake
+    ///@return Amount of gvEASE that is available for staking or bribing
     function powerAvailableForStake(address user)
         external
         view
@@ -105,7 +110,6 @@ contract GvToken is IGvToken {
 
     function balanceOf(address user) public view returns (uint256) {
         (uint256 depositAmount, uint256 powerEarned) = _balanceOf(user);
-
         return depositAmount + powerEarned;
     }
 
@@ -189,6 +193,15 @@ contract GvToken is IGvToken {
         _deposit(user, amount, depositStart, args, false);
     }
 
+    ///@notice Deposit EASE to obtain gvEASE that grows upto
+    ///twice the amount of ease being deposited.
+    ///@param user Wallet address to deposit for
+    ///@param amount Amount of EASE to deposit
+    ///@param depositStart Start time of deposit(current timestamp
+    /// for regular deposit and ahead timestart for vArmor holders)
+    ///@param args v,r,s and deadline for signed approvals (EIP-2612)
+    ///@param fromBribePot boolean to represent if reward being deposited
+    ///for compounding gvPower
     function _deposit(
         address user,
         uint256 amount,

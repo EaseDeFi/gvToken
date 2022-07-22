@@ -129,7 +129,9 @@ contract BribePot {
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
-
+    ///@notice Deposit gvEase of a user
+    ///@param from wallet address of a user
+    ///@param amount amount of gvEase to deposit to venal pot
     function deposit(address from, uint256 amount)
         external
         onlyGvToken(msg.sender)
@@ -142,6 +144,9 @@ contract BribePot {
         emit Deposited(from, amount);
     }
 
+    ///@notice Withdraw gvEase of user
+    ///@param from wallet address of a user
+    ///@param amount amount of gvEase to withdraw from venal pot
     function withdraw(address from, uint256 amount)
         external
         onlyGvToken(msg.sender)
@@ -287,6 +292,7 @@ contract BribePot {
 
     /* ========== PRIVATE ========== */
 
+    ///@notice Current week count from genesis starts at 0
     function getCurrWeek() private view returns (uint256) {
         return ((block.timestamp - genesis) / WEEK);
     }
@@ -360,6 +366,8 @@ contract BribePot {
                 (MULTIPLIER)) + rewards[account];
     }
 
+    ///@notice Update rewards collected and rewards per token paid
+    ///for the user's account
     function _update(address account) private {
         (
             uint256 additionalRewardPerToken,
