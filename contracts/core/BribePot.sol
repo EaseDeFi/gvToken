@@ -29,7 +29,7 @@ contract BribePot {
     /// @notice week upto which bribes has been updated (aka expired)
     uint256 public lastBribeUpdate;
 
-    /// @notice Nearest week in timestamp before deployment
+    /// @notice Nearest floor week in timestamp before deployment
     uint256 public immutable genesis = (block.timestamp / WEEK) * WEEK;
 
     /// @notice user => rca-vault => BribeDetail

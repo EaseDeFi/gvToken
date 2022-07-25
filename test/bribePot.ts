@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { BigNumber } from "ethers";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import { EaseToken__factory } from "../src/types";
@@ -282,6 +283,34 @@ describe("BribePot", function () {
             s,
           })
       ).to.revertedWith("bribe already exists");
+    });
+    it("should update period finish on new bribe", async function () {
+      //
+      // call deposit
+      const gvAmount = parseEther("100");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, gvAmount);
+      // call bribe
+      const bribePerWeek = parseEther("10");
+      const numOfWeeks = 4;
+      const genesis = await contracts.bribePot.genesis();
+      const periodFinishBefore = await contracts.bribePot.periodFinish();
+      expect(genesis).to.equal(periodFinishBefore);
+      await bribeFor(
+        signers.bob,
+        bribePerWeek,
+        contracts.bribePot,
+        contracts.ease,
+        numOfWeeks
+      );
+      // as bribe is active for 4 weeks and we round genesis to floor of the current week
+      // expected time finish becomes 5 weeks from genesis
+      const expectedTimeFinish = genesis.add(
+        BigNumber.from(TIME_IN_SECS.week).mul(numOfWeeks + 1)
+      );
+      const periodFinishAfter = await contracts.bribePot.periodFinish();
+      expect(periodFinishAfter).to.equal(expectedTimeFinish);
     });
   });
   describe("cancelBribe()", function () {
