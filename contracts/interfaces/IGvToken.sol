@@ -23,9 +23,7 @@ interface IGvToken {
 
     struct WithdrawRequest {
         uint128 amount;
-        uint128 rewards;
         uint128 endTime;
-        uint128 popCount; // index of _deposits
     }
 
     struct SupplyPointer {

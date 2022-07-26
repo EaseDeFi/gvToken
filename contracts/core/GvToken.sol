@@ -78,32 +78,29 @@ contract GvToken is IGvToken {
     }
 
     /* ========== VIEW FUNCTIONS ========== */
+    ///@notice Calculates amount of gvEASE staked by user to
+    ///specific rca-vault
+    ///@return Amount of gvEASE deposited to specific rca-vault
     function powerStaked(address user, address vault)
         external
         view
         returns (uint256)
     {
-        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
+        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(user);
         uint256 bribed = bribedAmount[user];
         return
             (_stakes[vault][user] *
                 ((depositedAmount + powerEarned) - bribed)) / MAX_PERCENT;
     }
 
+    ///@notice Calcualtes amount of gvEASE that is available for stake
+    ///@return Amount of gvEASE that is available for staking or bribing
     function powerAvailableForStake(address user)
         external
         view
         returns (uint256)
     {
-        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
+        (uint256 depositedAmount, uint256 powerEarned) = _balanceOf(user);
         uint256 bribed = bribedAmount[user];
         uint256 totalStaked = (_totalStaked[user] *
             ((depositedAmount + powerEarned) - bribed)) / MAX_PERCENT;
@@ -112,25 +109,7 @@ contract GvToken is IGvToken {
     }
 
     function balanceOf(address user) public view returns (uint256) {
-        (uint256 depositAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
-
-        return depositAmount + powerEarned;
-    }
-
-    function balanceOfAt(address user, uint256 timestamp)
-        external
-        view
-        returns (uint256)
-    {
-        (uint256 depositAmount, uint256 powerEarned) = _balanceOf(
-            user,
-            timestamp,
-            true
-        );
+        (uint256 depositAmount, uint256 powerEarned) = _balanceOf(user);
         return depositAmount + powerEarned;
     }
 
@@ -144,27 +123,20 @@ contract GvToken is IGvToken {
 
     /* ========== ACCOUNTING ========== */
 
-    function _balanceOf(
-        address user,
-        uint256 timestamp,
-        bool includeWithdrawal
-    ) private view returns (uint256 depositBalance, uint256 powerEarned) {
+    function _balanceOf(address user)
+        private
+        view
+        returns (uint256 depositBalance, uint256 powerEarned)
+    {
+        uint256 timestamp = block.timestamp;
         depositBalance = _totalDeposit[user];
 
-        WithdrawRequest memory currRequest = withdrawRequests[user];
-        uint256 length = _deposits[user].length;
-        uint256 i = includeWithdrawal ? length : length - currRequest.popCount;
-
+        uint256 i = _deposits[user].length;
         uint256 depositIncluded;
         for (i; i > 0; i--) {
             Deposit memory userDeposit = _deposits[user][i - 1];
 
-            // if timestamp is < userDeposit.start?
-            // meaning that deposit should not be included
-            if (timestamp < userDeposit.start) {
-                depositBalance -= userDeposit.amount;
-                continue;
-            } else if (timestamp - userDeposit.start > MAX_GROW) {
+            if ((timestamp - userDeposit.start) > MAX_GROW) {
                 // if we reach here that means we have max_grow
                 // has been achieved for earlier deposits
                 break;
@@ -173,15 +145,7 @@ contract GvToken is IGvToken {
             depositIncluded += userDeposit.amount;
             powerEarned += _powerEarned(userDeposit, timestamp);
         }
-        // add amount of max_grow achieved to powerEarned
-        if (includeWithdrawal) {
-            // add withdrawal amount
-            powerEarned +=
-                (depositBalance + currRequest.amount) -
-                depositIncluded;
-        } else {
-            powerEarned += (depositBalance - depositIncluded);
-        }
+        powerEarned += (depositBalance - depositIncluded);
     }
 
     function _powerEarned(Deposit memory userDeposit, uint256 timestamp)
@@ -208,12 +172,7 @@ contract GvToken is IGvToken {
     /* ========== DEPOSIT IMPL ========== */
 
     function deposit(uint256 amount, PermitArgs memory args) external {
-        address user = msg.sender;
-        uint256 rewardAmount;
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        _deposit(user, amount, rewardAmount, block.timestamp, args, false);
+        _deposit(msg.sender, amount, block.timestamp, args, false);
     }
 
     /// @notice Deposit for vArmor holders to give them
@@ -230,24 +189,29 @@ contract GvToken is IGvToken {
         require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
         require(depositStart >= genesis, "can't deposit before genesis");
 
-        uint256 rewardAmount;
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
         // collect power for vArmor holders
-        _deposit(user, amount, rewardAmount, depositStart, args, false);
+        _deposit(user, amount, depositStart, args, false);
     }
 
+    ///@notice Deposit EASE to obtain gvEASE that grows upto
+    ///twice the amount of ease being deposited.
+    ///@param user Wallet address to deposit for
+    ///@param amount Amount of EASE to deposit
+    ///@param depositStart Start time of deposit(current timestamp
+    /// for regular deposit and ahead timestart for vArmor holders)
+    ///@param args v,r,s and deadline for signed approvals (EIP-2612)
+    ///@param fromBribePot boolean to represent if reward being deposited
+    ///for compounding gvPower
     function _deposit(
         address user,
         uint256 amount,
-        uint256 rewardAmount,
         uint256 depositStart,
         PermitArgs memory args,
         bool fromBribePot
     ) private {
+        require(amount > 0, "cannot deposit 0!");
         Deposit memory newDeposit = Deposit(
-            uint128(amount + rewardAmount),
+            uint128(amount),
             uint32(depositStart)
         );
 
@@ -277,98 +241,83 @@ contract GvToken is IGvToken {
     /// @notice Request redemption of gvEASE back to ease
     /// Has a withdrawal delay which will work in 2 parts(request and finalize)
     /// @param amount The amount of tokens in EASE to withdraw
-    /// @param includeBribePot Boolean that will withdraw
     /// gvEASE from bribe pot if true
-    function withdrawRequest(uint256 amount, bool includeBribePot) external {
+    function withdrawRequest(uint256 amount) external {
         address user = msg.sender;
         require(amount <= _totalDeposit[user], "not enough deposit!");
         WithdrawRequest memory currRequest = withdrawRequests[user];
 
-        uint256 popCount = _updateDepositsAndGetPopCount(
-            user,
-            amount,
-            currRequest
-        );
+        // withdraw form bribe pot if necessary
+        _withdrawFromPot(user, amount);
 
-        uint256 timestamp = (block.timestamp / WEEK) * WEEK;
-
-        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(
-            user,
-            timestamp,
-            false
-        );
-        // whether user is willing to withdraw from bribe pot
-        // we will not add reward amount to withdraw if user doesn't
-        // want to withdraw from bribe pot
-        if (includeBribePot && bribedAmount[user] != 0) {
-            uint256 conversionRate = (((depositBalance + earnedPower) *
-                MULTIPLIER) / depositBalance);
-            uint256 amountToWithdrawFromPot = (amount * conversionRate) /
-                MULTIPLIER;
-            if (bribedAmount[user] < amountToWithdrawFromPot) {
-                amountToWithdrawFromPot = bribedAmount[user];
-            }
-            pot.withdraw(user, amountToWithdrawFromPot);
-            // add rewardAmount to withdraw amount
-            currRequest.rewards += uint128(pot.getReward(user));
-            bribedAmount[user] -= amountToWithdrawFromPot;
-        }
+        _updateDeposits(user, amount);
 
         _totalDeposit[user] -= amount;
 
         uint256 endTime = block.timestamp + withdrawalDelay;
         currRequest.endTime = uint32(endTime);
         currRequest.amount += uint128(amount);
-        currRequest.popCount += uint16(popCount);
         withdrawRequests[user] = currRequest;
 
         emit RedeemRequest(user, amount, endTime);
     }
 
-    function _updateDepositsAndGetPopCount(
-        address user,
-        uint256 withDrawAmount,
-        WithdrawRequest memory currRequest
-    ) private returns (uint256) {
-        //
+    ///@notice Withraw from bribe pot if withdraw amount of gvEASE exceeds
+    ///(gvEase balance - bribed amount)
+    function _withdrawFromPot(address user, uint256 amount) private {
+        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(user);
+        // Ease to gvEASE
+        uint256 conversionRate = (((depositBalance + earnedPower) *
+            MULTIPLIER) / depositBalance);
+        uint256 gvAmountToWithdraw = (amount * conversionRate) / MULTIPLIER;
+        uint256 totalBribed = bribedAmount[user];
+        uint256 gvAmtAvailableForBribe = (depositBalance + earnedPower) -
+            totalBribed;
+        // whether user is willing to withdraw from bribe pot
+        // we will not add reward amount to withdraw if user doesn't
+        // want to withdraw from bribe pot
+        if (totalBribed > 0 && gvAmountToWithdraw > gvAmtAvailableForBribe) {
+            uint256 amtToWithdrawFromPot = gvAmountToWithdraw -
+                gvAmtAvailableForBribe;
+            pot.withdraw(user, amtToWithdrawFromPot);
+            bribedAmount[user] -= amtToWithdrawFromPot;
+        }
+    }
+
+    ///@notice Loops through deposits of user from last index and pop's off the
+    ///ones that are included in withdraw amount
+    function _updateDeposits(address user, uint256 withDrawAmount) private {
         Deposit memory remainder;
         uint256 totalAmount;
         // current deposit details
         Deposit memory userDeposit;
-        // index to loop from
-        uint256 startIndex = _deposits[user].length;
 
-        startIndex = currRequest.amount > 0
-            ? (startIndex - currRequest.popCount)
-            : startIndex;
-        uint256 i = startIndex;
+        // index to loop from
+        uint256 i = _deposits[user].length;
         for (i; i > 0; i--) {
             userDeposit = _deposits[user][i - 1];
             totalAmount += userDeposit.amount;
+            // remove last deposit
+            _deposits[user].pop();
+
             // Let's say user tries to withdraw 100 EASE and they have
             // multiple ease deposits [75, 30] EASE when our loop is
             // at index 0 total amount will be 105, that means we need
-            // to store the remainder and replace that index later
+            // to push the remainder to deposits array
             if (totalAmount >= withDrawAmount) {
                 remainder.amount = uint128(totalAmount - withDrawAmount);
                 remainder.start = userDeposit.start;
                 break;
             }
-            _deposits[user][i - 1] = userDeposit;
         }
 
         // If there is a remainder we need to update the index at which
         // we broke out of loop and push the withdrawan amount to user
         // _deposits withdraw 100 ease from [75, 30] EASE balance becomes
-        // [5, 70, 75]
+        // [5]
         if (remainder.amount != 0) {
-            Deposit memory lastDepositWithdrawan = _deposits[user][i - 1];
-            lastDepositWithdrawan.amount -= remainder.amount;
-            _deposits[user][i - 1] = remainder;
-            _deposits[user].push(lastDepositWithdrawan);
+            _deposits[user].push(remainder);
         }
-
-        return startIndex - (i - 1);
     }
 
     /// @notice Used to exchange gvEASE back to ease token and transfers
@@ -384,15 +333,8 @@ contract GvToken is IGvToken {
             "withdrawal not yet allowed"
         );
 
-        // pop off the number of deposits that has been withdrawn
-        for (uint256 i = 0; i < userReq.popCount; i++) {
-            _deposits[user].pop();
-        }
+        stakingToken.safeTransfer(user, userReq.amount);
 
-        uint256 amount = userReq.amount + userReq.rewards;
-        stakingToken.safeTransfer(user, amount);
-
-        // TODO: should I care about rewards here?
         emit RedeemFinalize(user, userReq.amount);
     }
 
@@ -404,16 +346,6 @@ contract GvToken is IGvToken {
     function stake(uint256 balancePercent, address vault) external {
         require(rcaController.activeShields(vault), "vault not active");
         address user = msg.sender;
-        // deposit reward
-        PermitArgs memory args;
-        // TODO: should we limit this deposit call monthly?
-        uint256 rewardAmount;
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        if (rewardAmount != 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
-        }
 
         uint256 totalStake = _totalStaked[user];
         totalStake += balancePercent;
@@ -432,17 +364,6 @@ contract GvToken is IGvToken {
     /// @param vault RCA-vault address
     function unStake(uint256 balancePercent, address vault) external {
         address user = msg.sender;
-        // deposit reward
-        PermitArgs memory args;
-        // TODO: should we limit this deposit call monthly?
-        uint256 rewardAmount;
-        // collect rewards and add to user _deposits to gain more gvToken
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        if (rewardAmount != 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
-        }
 
         _stakes[vault][user] -= balancePercent;
         _totalStaked[user] -= balancePercent;
@@ -459,11 +380,7 @@ contract GvToken is IGvToken {
         // deposits user gvEase to bribe pot and
         // get rewards against it
         address user = msg.sender;
-        (uint256 amountDeposited, uint256 powerEarned) = _balanceOf(
-            user,
-            block.timestamp,
-            false
-        );
+        (uint256 amountDeposited, uint256 powerEarned) = _balanceOf(user);
         uint256 totalPower = amountDeposited + powerEarned;
         uint256 bribed = bribedAmount[user];
 
@@ -478,37 +395,28 @@ contract GvToken is IGvToken {
     /// pot and collects earned rewards
     function withdrawFromPot(uint256 amount) external {
         // withdraws user gvToken from bribe pot
-        address user = msg.sender;
-        PermitArgs memory args;
-        uint256 rewardAmount;
-        // claim reward from the bribe pot
-        if (bribedAmount[user] != 0) {
-            rewardAmount = pot.getReward(user);
-        }
-        // deposit reward to increase user's gvEASE
-        if (rewardAmount != 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
-        }
-
-        _withdrawFromPot(msg.sender, amount);
+        bribedAmount[msg.sender] -= amount;
+        pot.withdraw(msg.sender, amount);
     }
 
-    function _withdrawFromPot(address user, uint256 amount) private {
-        bribedAmount[user] -= amount;
-        pot.withdraw(user, amount);
+    ///@notice Allows user to claim rewards
+    function claimReward() external {
+        pot.getReward(msg.sender, true);
     }
 
     /// @notice Allows account to claim rewards from Bribe pot and deposit
     /// to gain more gvEASE
     function claimAndDepositReward() external {
         address user = msg.sender;
-        uint256 rewardAmount;
+        // bribe rewards from the pot
+        uint256 amount;
+
         PermitArgs memory args;
         if (bribedAmount[user] > 0) {
-            rewardAmount = pot.getReward(user);
+            amount = pot.getReward(user, false);
         }
-        if (rewardAmount > 0) {
-            _deposit(user, 0, rewardAmount, block.timestamp, args, true);
+        if (amount > 0) {
+            _deposit(user, amount, block.timestamp, args, true);
         }
     }
 
@@ -768,7 +676,6 @@ contract GvToken is IGvToken {
 
     function setDelay(uint256 time) external onlyGov {
         time = (time / 1 weeks) * 1 weeks;
-        // TODO: what should be minimum delay that even gov can't go under
         require(time > 2 weeks, "min delay 14 days");
         withdrawalDelay = time;
     }

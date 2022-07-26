@@ -1,10 +1,11 @@
 import { expect } from "chai";
+import { BigNumber } from "ethers";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import { EaseToken__factory } from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
 import { RCA_CONTROLLER, RCA_VAULT } from "./constants";
-import { getPermitSignature } from "./helpers";
+import { bribeFor, getPermitSignature } from "./helpers";
 import { Contracts, Signers } from "./types";
 import { getTimestamp, fastForward, mine, TIME_IN_SECS } from "./utils";
 
@@ -79,7 +80,7 @@ describe("BribePot", function () {
           .withdraw(aliceAddress, parseEther("100"))
       ).to.revertedWith("only gvToken");
       await expect(
-        contracts.bribePot.connect(signers.bob).getReward(aliceAddress)
+        contracts.bribePot.connect(signers.bob).getReward(aliceAddress, false)
       ).to.revertedWith("only gvToken");
     });
   });
@@ -150,7 +151,6 @@ describe("BribePot", function () {
         .deposit(bobAddress, gvAmount);
 
       const rewardPerToken = await contracts.bribePot.rewardPerToken();
-
       expect(rewardPerToken).to.gte(parseEther("0.1"));
 
       // fast forward 4 days
@@ -169,7 +169,9 @@ describe("BribePot", function () {
         signers.gvToken.address
       );
 
-      await contracts.bribePot.connect(signers.gvToken).getReward(bobAddress);
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .getReward(bobAddress, false);
       const balanceAfter = await contracts.ease.balanceOf(
         signers.gvToken.address
       );
@@ -282,6 +284,34 @@ describe("BribePot", function () {
           })
       ).to.revertedWith("bribe already exists");
     });
+    it("should update period finish on new bribe", async function () {
+      //
+      // call deposit
+      const gvAmount = parseEther("100");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, gvAmount);
+      // call bribe
+      const bribePerWeek = parseEther("10");
+      const numOfWeeks = 4;
+      const genesis = await contracts.bribePot.genesis();
+      const periodFinishBefore = await contracts.bribePot.periodFinish();
+      expect(genesis).to.equal(periodFinishBefore);
+      await bribeFor(
+        signers.bob,
+        bribePerWeek,
+        contracts.bribePot,
+        contracts.ease,
+        numOfWeeks
+      );
+      // as bribe is active for 4 weeks and we round genesis to floor of the current week
+      // expected time finish becomes 5 weeks from genesis
+      const expectedTimeFinish = genesis.add(
+        BigNumber.from(TIME_IN_SECS.week).mul(numOfWeeks + 1)
+      );
+      const periodFinishAfter = await contracts.bribePot.periodFinish();
+      expect(periodFinishAfter).to.equal(expectedTimeFinish);
+    });
   });
   describe("cancelBribe()", function () {
     it("should allow briber to cancel bribe and recieve remaining EASE", async function () {
@@ -294,25 +324,13 @@ describe("BribePot", function () {
       const bribePerWeek = parseEther("10");
       const rcaVaultAddress = RCA_VAULT;
       const numOfWeeks = 4;
-      // get signature
-      const value = bribePerWeek.mul(numOfWeeks);
-      const spender = contracts.bribePot.address;
-      const deadline = (await getTimestamp()).add(1000);
-      const { v, r, s } = await getPermitSignature({
-        signer: signers.briber,
-        token: contracts.ease,
-        value,
-        deadline,
-        spender,
-      });
-      await contracts.bribePot
-        .connect(signers.briber)
-        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
-          deadline,
-          v,
-          r,
-          s,
-        });
+      await bribeFor(
+        signers.briber,
+        bribePerWeek,
+        contracts.bribePot,
+        contracts.ease,
+        numOfWeeks
+      );
       // deducting 100 secs because tests running in succession may take few seconds
       await fastForward(TIME_IN_SECS.week - 100);
       await mine();
@@ -324,6 +342,47 @@ describe("BribePot", function () {
       expect(userEaseBalAfter.sub(userEaseBalBefore)).to.equal(
         bribePerWeek.mul(3)
       );
+    });
+    it("should update period finish correctly", async function () {
+      // call deposit
+      const gvAmount = parseEther("100");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+
+      await bribeFor(
+        signers.bob,
+        parseEther("10"),
+        contracts.bribePot,
+        contracts.ease,
+        4
+      );
+      await bribeFor(
+        signers.briber,
+        parseEther("20"),
+        contracts.bribePot,
+        contracts.ease,
+        10
+      );
+
+      let periodFinish = await contracts.bribePot.periodFinish();
+      let expectedPeriodFinish = (await contracts.bribePot.genesis()).add(
+        TIME_IN_SECS.week * 11
+      );
+      expect(periodFinish).to.equal(expectedPeriodFinish);
+      // Move 3 weeks forward
+      await fastForward(TIME_IN_SECS.week * 3);
+      await mine();
+
+      // cancle bribe
+      await contracts.bribePot.connect(signers.briber).cancelBribe(RCA_VAULT);
+
+      periodFinish = await contracts.bribePot.periodFinish();
+      // as signer bob is bribing for 4 week period
+      expectedPeriodFinish = (await contracts.bribePot.genesis()).add(
+        TIME_IN_SECS.week * 5
+      );
+      expect(periodFinish).to.equal(expectedPeriodFinish);
     });
   });
 
@@ -366,7 +425,9 @@ describe("BribePot", function () {
         .connect(signers.gvToken)
         .withdraw(aliceAddress, gvAmount);
 
-      await contracts.bribePot.connect(signers.gvToken).getReward(aliceAddress);
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .getReward(aliceAddress, false);
 
       const balanceAfter = await contracts.ease.balanceOf(
         signers.gvToken.address
@@ -614,7 +675,7 @@ describe("BribePot", function () {
       expect(earned).to.gte(parseEther("11"));
 
       // call get reward function
-      await contracts.bribePot.getReward(bobAddress);
+      await contracts.bribePot.getReward(bobAddress, false);
 
       // check last reward update should be equal to timestamp
       const lastRewardUpdate = await contracts.bribePot.lastRewardUpdate();
@@ -638,6 +699,7 @@ describe("BribePot", function () {
       const bobRewardsToClaim = await contracts.bribePot.rewards(bobAddress);
       expect(bobRewardsToClaim).to.equal(0);
     });
+
     it("should collect rewards to gvToken address", async function () {
       // fast forward 2nd day of week2
       await fastForward(TIME_IN_SECS.week + TIME_IN_SECS.day * 2);
@@ -648,13 +710,26 @@ describe("BribePot", function () {
       );
 
       // call get reward function
-      await contracts.bribePot.getReward(bobAddress);
+      await contracts.bribePot.getReward(bobAddress, false);
       const gvTokenEaseBalanceAfter = await contracts.ease.balanceOf(
         signers.gvToken.address
       );
       expect(gvTokenEaseBalanceAfter.sub(gvTokenEaseBalanceBefore)).to.gte(
         parseEther("11")
       );
+    });
+
+    it("should collect rewards to the user address", async function () {
+      // fast forward 2nd day of week2
+      await fastForward(TIME_IN_SECS.week + TIME_IN_SECS.day * 2);
+      await mine();
+
+      const bobEaseBalBefore = await contracts.ease.balanceOf(bobAddress);
+
+      // call get reward function
+      await contracts.bribePot.getReward(bobAddress, true);
+      const bobEaseBalAfter = await contracts.ease.balanceOf(bobAddress);
+      expect(bobEaseBalAfter.sub(bobEaseBalBefore)).to.gte(parseEther("11"));
     });
   });
 });
