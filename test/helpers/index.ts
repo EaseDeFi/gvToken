@@ -1,6 +1,6 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, ethers, Signature } from "ethers";
-import { BribePot, EaseToken } from "../../src/types";
+import { BribePot, EaseToken, GvToken } from "../../src/types";
 import { RCA_VAULT } from "../constants";
 import { PermitSigArgs } from "../types";
 import { getTimestamp } from "../utils";
@@ -67,10 +67,10 @@ export async function bribeFor(
   bribePerWeek: BigNumber,
   bribePot: BribePot,
   token: EaseToken,
-  numOfWeeks: number
+  numOfWeeks: number,
+  rcaVaultAddress = RCA_VAULT
 ) {
   // add bribe to bribe pot
-  const rcaVaultAddress = RCA_VAULT;
   const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
   const spender = bribePot.address;
   const deadline = (await getTimestamp()).add(1000);
@@ -85,6 +85,31 @@ export async function bribeFor(
   await bribePot
     .connect(briber)
     .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+      deadline,
+      v,
+      r,
+      s,
+    });
+}
+
+export async function depositFor(
+  user: SignerWithAddress,
+  value: BigNumber,
+  gvToken: GvToken,
+  ease: EaseToken
+) {
+  const deadline = (await getTimestamp()).add(1000);
+  const spender = gvToken.address;
+  const { v, r, s } = await getPermitSignature({
+    signer: user,
+    token: ease,
+    value,
+    deadline,
+    spender,
+  });
+  await gvToken
+    .connect(user)
+    ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](value, {
       deadline,
       v,
       r,
