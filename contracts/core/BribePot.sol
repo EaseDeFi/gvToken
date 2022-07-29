@@ -146,9 +146,9 @@ contract BribePot {
     }
 
     ///@notice Calculates amount of gvToken briber can get for bribing EASE
-    ///@param easeAmt Amount of EASE token
+    ///@param bribeRate Bribe per week in EASE
     ///@return gvAmt Amount of gvEase briber will be given
-    function expectedGvAmt(uint256 easeAmt)
+    function expectedGvAmount(uint256 bribeRate)
         external
         view
         returns (uint256 gvAmt)
@@ -157,7 +157,7 @@ contract BribePot {
         if (currBribePerWeek == 0) {
             gvAmt = _totalSupply;
         } else {
-            gvAmt = (easeAmt * _totalSupply) / currBribePerWeek;
+            gvAmt = (bribeRate * _totalSupply) / (currBribePerWeek + bribeRate);
         }
     }
 

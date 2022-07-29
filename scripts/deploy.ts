@@ -17,7 +17,6 @@ import {
 import {
   MAINNET_ADDRESSES,
   RCA_CONTROLLER,
-  RCA_VAULT,
   RCA_VAULTS,
 } from "../test/constants";
 import { Contracts, Signers } from "../test/types";
