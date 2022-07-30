@@ -21,8 +21,8 @@ contract BribePot {
     address public gvToken;
     /// @notice Time upto which bribe rewards are active
     uint256 public periodFinish = 0;
-    /// @notice A dynamic total amount of EASE token to bribe whole pot
-    uint256 public bribePerWeek = 0;
+    /// @notice Bribe per week stored at last bribe update week
+    uint256 private _bribeRateStored = 0;
     /// @notice Last updated timestamp
     uint256 public lastRewardUpdate;
     uint256 public rewardPerTokenStored;
@@ -128,6 +128,52 @@ contract BribePot {
         return _earned(account, currRewardPerToken);
     }
 
+    ///@notice Calculates total bribe per week for current week
+    ///@return bribeRate Total bribe per week for entire venal pot
+    function bribePerWeek() external view returns (uint256 bribeRate) {
+        bribeRate = _getCurrWeekBribeRate();
+    }
+
+    ///@notice Calculates total reward user can earn current week
+    ///@param user User address to calculate reward for
+    ///@return rewardAmt Amount of ease user can get from current week
+    function earnable(address user) external view returns (uint256 rewardAmt) {
+        if (_totalSupply == 0) {
+            return 0;
+        }
+        uint256 totalBribePerWeek = _getCurrWeekBribeRate();
+        rewardAmt = (_balances[user] * totalBribePerWeek) / _totalSupply;
+    }
+
+    ///@notice Calculates amount of gvToken briber can get for bribing EASE
+    ///@param bribeRate Bribe per week in EASE
+    ///@return gvAmt Amount of gvEase briber will be given
+    function expectedGvAmount(uint256 bribeRate)
+        external
+        view
+        returns (uint256 gvAmt)
+    {
+        uint256 currBribePerWeek = _getCurrWeekBribeRate();
+        if (currBribePerWeek == 0) {
+            gvAmt = _totalSupply;
+        } else {
+            gvAmt = (bribeRate * _totalSupply) / (currBribePerWeek + bribeRate);
+        }
+    }
+
+    function earningsPerWeek(uint256 gvAmt)
+        external
+        view
+        returns (uint256 rewardAmt)
+    {
+        uint256 currBribeRate = _getCurrWeekBribeRate();
+        if (currBribeRate == 0 || gvAmt == 0) {
+            rewardAmt = 0;
+        } else {
+            rewardAmt = (currBribeRate * gvAmt) / (_totalSupply + gvAmt);
+        }
+    }
+
     /* ========== RESTRICTED FUNCTIONS ========== */
     ///@notice Deposit gvEase of a user
     ///@param from wallet address of a user
@@ -205,7 +251,7 @@ contract BribePot {
         address briber = msg.sender;
         // check if bribe already exists
         require(
-            bribes[briber][vault].endWeek <= getCurrWeek(),
+            bribes[briber][vault].endWeek <= _getCurrWeek(),
             "bribe already exists"
         );
 
@@ -249,7 +295,7 @@ contract BribePot {
         address briber = msg.sender;
         BribeDetail memory userBribe = bribes[briber][vault];
         delete bribes[briber][vault];
-        uint256 currWeek = getCurrWeek();
+        uint256 currWeek = _getCurrWeek();
 
         // if bribe starts at week 1 and ends at week 5 that
         // means number of week bribe will be active is 4 weeks
@@ -293,8 +339,33 @@ contract BribePot {
     /* ========== PRIVATE ========== */
 
     ///@notice Current week count from genesis starts at 0
-    function getCurrWeek() private view returns (uint256) {
+    function _getCurrWeek() private view returns (uint256) {
         return ((block.timestamp - genesis) / WEEK);
+    }
+
+    ///@notice calculates bribe rate for current week
+    ///@return currBribePerWeek Current week total bribe amount for
+    ///entire venal pot
+    function _getCurrWeekBribeRate()
+        private
+        view
+        returns (uint256 currBribePerWeek)
+    {
+        uint256 _lastBribeUpdate = lastBribeUpdate;
+        uint256 bribeUpdatedUpto = _lastBribeUpdate;
+        uint256 currWeek = _getCurrWeek();
+        currBribePerWeek = _bribeRateStored;
+        BribeRate memory rates;
+        if (currWeek != _lastBribeUpdate) {
+            // if we are inside this conditional that means we
+            // need to update bribeRate for current week
+            while (currWeek >= bribeUpdatedUpto) {
+                rates = bribeRates[bribeUpdatedUpto];
+                currBribePerWeek -= rates.expireAmt;
+                currBribePerWeek += rates.startAmt;
+                bribeUpdatedUpto++;
+            }
+        }
     }
 
     /// @notice calculates additional reward per token and current bribe
@@ -316,10 +387,10 @@ contract BribePot {
         uint256 _lastBribeUpdate = lastBribeUpdate;
 
         bribeUpdatedUpto = _lastBribeUpdate;
-        uint256 currWeek = getCurrWeek();
+        uint256 currWeek = _getCurrWeek();
         uint256 rewardedUpto = (lastRewardUpdate - genesis) % WEEK;
 
-        currentBribePerWeek = bribePerWeek;
+        currentBribePerWeek = _bribeRateStored;
         BribeRate memory rates;
         while (currWeek > bribeUpdatedUpto) {
             if (_totalSupply != 0) {
@@ -376,7 +447,7 @@ contract BribePot {
         ) = _getBribeUpdates();
 
         lastBribeUpdate = bribeUpdatedUpto;
-        bribePerWeek = currBribePerWeek;
+        _bribeRateStored = currBribePerWeek;
 
         rewardPerTokenStored = _rewardPerToken(
             additionalRewardPerToken,

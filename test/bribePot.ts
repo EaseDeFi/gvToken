@@ -732,4 +732,221 @@ describe("BribePot", function () {
       expect(bobEaseBalAfter.sub(bobEaseBalBefore)).to.gte(parseEther("11"));
     });
   });
+  describe("bribePerWeek()", function () {
+    it("should return correct bribe per week", async function () {
+      // bribe per week
+      const amount = parseEther("1000");
+
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, amount);
+
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, amount.div(2));
+
+      // call bribe
+      const bribePerWeek = parseEther("15");
+      const rcaVaultAddress = RCA_VAULT;
+      const bribePeriodInWeeks = 4;
+
+      // get signature
+      const value = bribePerWeek.mul(bribePeriodInWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, bribePeriodInWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      let bribeRate = await contracts.bribePot.bribePerWeek();
+      expect(bribeRate).to.equal(0);
+
+      // fast forward 2 weeks
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+
+      bribeRate = await contracts.bribePot.bribePerWeek();
+      expect(bribeRate).to.equal(bribePerWeek);
+      // fast forward 2 weeks
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+      bribeRate = await contracts.bribePot.bribePerWeek();
+      expect(bribeRate).to.equal(bribePerWeek);
+
+      // if we fast forward 1 week we will reach to week 5 which
+      // means that the bribe will no longer be active
+      await fastForward(TIME_IN_SECS.week * 2);
+      await mine();
+      bribeRate = await contracts.bribePot.bribePerWeek();
+      expect(bribeRate).to.equal(0);
+    });
+  });
+  describe("earnable()", function () {
+    it("should return correct value for earnable", async function () {
+      const amount = parseEther("1000");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, amount);
+
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, amount.div(2));
+
+      // call bribe
+      const bribePerWeek = parseEther("15");
+      const rcaVaultAddress = RCA_VAULT;
+      const bribePeriodInWeeks = 4;
+      // get signature
+      const value = bribePerWeek.mul(bribePeriodInWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, bribePeriodInWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      // move to a week where bribe is active
+      await fastForward(TIME_IN_SECS.week);
+      await mine();
+
+      const aliceEarnable = await contracts.bribePot.earnable(aliceAddress);
+      // as alice has 33.33% of total supply deposited gvEASE she should get
+      // 33.33% of rewards for current week
+      expect(aliceEarnable).to.equal(parseEther("5"));
+
+      const bobEarnable = await contracts.bribePot.earnable(bobAddress);
+      // as alice has 66.66% of total supply deposited gvEASE he should get
+      // 66.66% of rewards for current week
+      expect(bobEarnable).to.equal(parseEther("10"));
+    });
+  });
+  describe("expectedGvAmount()", function () {
+    it("should return correct expected gvEase amount", async function () {
+      const amount = parseEther("1000");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, amount);
+
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, amount.div(2));
+
+      // call bribe
+      const bribePerWeek = parseEther("15");
+      const rcaVaultAddress = RCA_VAULT;
+      const bribePeriodInWeeks = 4;
+
+      let expectedGvAmount = await contracts.bribePot.expectedGvAmount(
+        bribePerWeek
+      );
+      // user should get 100% of total supply if he is the first briber
+      const totalSupply = await contracts.bribePot.totalSupply();
+      expect(expectedGvAmount).to.equal(totalSupply);
+
+      // get signature
+      const value = bribePerWeek.mul(bribePeriodInWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, bribePeriodInWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      // move forward to next week so bribe becomes active
+      await fastForward(TIME_IN_SECS.week);
+      await mine();
+
+      expectedGvAmount = await contracts.bribePot.expectedGvAmount(
+        bribePerWeek
+      );
+      // expected gvAmount should be 50% of total supply
+      expect(expectedGvAmount).to.equal(totalSupply.div(2));
+    });
+  });
+  describe("earningsPerWeek()", function () {
+    it("should return correct earnings per week", async function () {
+      const amount = parseEther("1000");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, amount);
+
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, amount.div(2));
+
+      // call bribe
+      const bribePerWeek = parseEther("15");
+      const rcaVaultAddress = RCA_VAULT;
+      const bribePeriodInWeeks = 4;
+      // get signature
+      const value = bribePerWeek.mul(bribePeriodInWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value,
+        deadline,
+        spender,
+      });
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, bribePeriodInWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+      // move forward to next week so bribe becomes active
+      await fastForward(TIME_IN_SECS.week);
+      await mine();
+      const totalSupply = await contracts.bribePot.totalSupply();
+
+      // if the user supplies gvEASE equal to total supply their earnings
+      // per week should be 50% of bribeRate
+      let earningsPerWeek = await contracts.bribePot.earningsPerWeek(
+        totalSupply
+      );
+      // if a user is willing to deposit 100% of total supply he should get
+      // 50.00% of rewards
+      expect(earningsPerWeek).to.equal(bribePerWeek.div(2));
+      earningsPerWeek = await contracts.bribePot.earningsPerWeek(
+        totalSupply.div(2)
+      );
+      // if a user is willing to deposit 50% of total supply he should get
+      // 33.33% of rewards
+      expect(earningsPerWeek).to.equal(bribePerWeek.div(3));
+    });
+  });
 });
