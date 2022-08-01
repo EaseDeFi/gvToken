@@ -35,6 +35,8 @@ contract GvToken is IGvToken {
     address public gov;
     /// @notice total amount of EASE deposited
     uint256 public totalDeposited;
+    /// @notice total supply of gvEase
+    uint256 private _totalSupply;
 
     /// @notice Time delay for withdrawals which will be set by governance
     uint256 public withdrawalDelay = 14 days;
@@ -167,6 +169,10 @@ contract GvToken is IGvToken {
         return powerGrowth;
     }
 
+    function totalSupply() external view returns (uint256) {
+        return _totalSupply;
+    }
+
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /* ========== DEPOSIT IMPL ========== */
@@ -218,6 +224,7 @@ contract GvToken is IGvToken {
         // we transfer from user if we are not just compounding rewards
         // contract wide ease balance
         totalDeposited += newDeposit.amount;
+        _totalSupply += newDeposit.amount;
         _totalDeposit[user] += newDeposit.amount;
         _deposits[user].push(newDeposit);
 
@@ -247,12 +254,18 @@ contract GvToken is IGvToken {
         require(amount <= _totalDeposit[user], "not enough deposit!");
         WithdrawRequest memory currRequest = withdrawRequests[user];
 
+        // Calculate gvToken being withdrawn
+        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(user);
+        uint256 conversionRate = (((depositBalance + earnedPower) *
+            MULTIPLIER) / depositBalance);
+        uint256 gvAmtToWithdraw = (amount * conversionRate) / MULTIPLIER;
+
         // withdraw form bribe pot if necessary
-        _withdrawFromPot(user, amount);
+        _withdrawFromPot(user, gvAmtToWithdraw, depositBalance + earnedPower);
 
         _updateDeposits(user, amount);
 
-        _totalDeposit[user] -= amount;
+        _updateTotalSupply(gvAmtToWithdraw);
 
         uint256 endTime = block.timestamp + withdrawalDelay;
         currRequest.endTime = uint32(endTime);
@@ -264,15 +277,13 @@ contract GvToken is IGvToken {
 
     ///@notice Withraw from bribe pot if withdraw amount of gvEASE exceeds
     ///(gvEase balance - bribed amount)
-    function _withdrawFromPot(address user, uint256 amount) private {
-        (uint256 depositBalance, uint256 earnedPower) = _balanceOf(user);
-        // Ease to gvEASE
-        uint256 conversionRate = (((depositBalance + earnedPower) *
-            MULTIPLIER) / depositBalance);
-        uint256 gvAmountToWithdraw = (amount * conversionRate) / MULTIPLIER;
+    function _withdrawFromPot(
+        address user,
+        uint256 gvAmountToWithdraw,
+        uint256 userTotalGvBal
+    ) private {
         uint256 totalBribed = bribedAmount[user];
-        uint256 gvAmtAvailableForBribe = (depositBalance + earnedPower) -
-            totalBribed;
+        uint256 gvAmtAvailableForBribe = userTotalGvBal - totalBribed;
         // whether user is willing to withdraw from bribe pot
         // we will not add reward amount to withdraw if user doesn't
         // want to withdraw from bribe pot
@@ -286,12 +297,14 @@ contract GvToken is IGvToken {
 
     ///@notice Loops through deposits of user from last index and pop's off the
     ///ones that are included in withdraw amount
-    function _updateDeposits(address user, uint256 withDrawAmount) private {
+    function _updateDeposits(address user, uint256 withdrawAmount) private {
         Deposit memory remainder;
         uint256 totalAmount;
         // current deposit details
         Deposit memory userDeposit;
 
+        totalDeposited -= withdrawAmount;
+        _totalDeposit[user] -= withdrawAmount;
         // index to loop from
         uint256 i = _deposits[user].length;
         for (i; i > 0; i--) {
@@ -304,8 +317,8 @@ contract GvToken is IGvToken {
             // multiple ease deposits [75, 30] EASE when our loop is
             // at index 0 total amount will be 105, that means we need
             // to push the remainder to deposits array
-            if (totalAmount >= withDrawAmount) {
-                remainder.amount = uint128(totalAmount - withDrawAmount);
+            if (totalAmount >= withdrawAmount) {
+                remainder.amount = uint128(totalAmount - withdrawAmount);
                 remainder.start = userDeposit.start;
                 break;
             }
@@ -317,6 +330,20 @@ contract GvToken is IGvToken {
         // [5]
         if (remainder.amount != 0) {
             _deposits[user].push(remainder);
+        }
+    }
+
+    ///@notice Updates total supply on withdraw request
+    /// @param gvAmtToWithdraw Amount of gvToken to withdraw of a user
+    function _updateTotalSupply(uint256 gvAmtToWithdraw) private {
+        // if _totalSupply is not in Sync with the grown votes of users
+        // and if it's the last user wanting to get out of this contract
+        // we need to take consideration of underflow and at the same time
+        // set total supply to zero
+        if (_totalSupply < gvAmtToWithdraw || totalDeposited == 0) {
+            _totalSupply = 0;
+        } else {
+            _totalSupply -= gvAmtToWithdraw;
         }
     }
 
@@ -678,5 +705,14 @@ contract GvToken is IGvToken {
         time = (time / 1 weeks) * 1 weeks;
         require(time > 2 weeks, "min delay 14 days");
         withdrawalDelay = time;
+    }
+
+    function setTotalSupply(uint256 amount) external onlyGov {
+        uint256 totalEaseDeposit = totalDeposited;
+        require(
+            amount > totalEaseDeposit && amount < (totalEaseDeposit * 2),
+            "not in range"
+        );
+        _totalSupply = amount;
     }
 }
