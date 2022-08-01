@@ -883,4 +883,29 @@ describe("GvToken", function () {
       expect(bobDelegated).to.equal(bobBalance);
     });
   });
+  describe("totalSupply()", function () {
+    it("should update totalSupply on deposit", async function () {
+      const depositAmount = parseEther("100");
+      await depositFor(signers.user, depositAmount);
+      const totalSupply = await contracts.gvToken.totalSupply();
+      expect(totalSupply).to.equal(depositAmount);
+    });
+    it("should update totalSupply on withdraw", async function () {
+      const depositAmount = parseEther("100");
+      await depositFor(signers.user, depositAmount);
+
+      await fastForward(TIME_IN_SECS.month);
+      await mine();
+      // By this time the user's gvToken balance should be more
+      // than deposit amount but total supply will still be deposit
+      // if the below will not underflow then our logic to update
+      // totalsupply works
+      await contracts.gvToken
+        .connect(signers.user)
+        .withdrawRequest(depositAmount);
+
+      const totalSupply = await contracts.gvToken.totalSupply();
+      expect(totalSupply).to.equal(0);
+    });
+  });
 });
