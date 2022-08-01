@@ -259,13 +259,16 @@ contract GvToken is IGvToken {
         uint256 conversionRate = (((depositBalance + earnedPower) *
             MULTIPLIER) / depositBalance);
         uint256 gvAmtToWithdraw = (amount * conversionRate) / MULTIPLIER;
+        uint256 gvBalance = depositBalance + earnedPower;
 
         // withdraw form bribe pot if necessary
-        _withdrawFromPot(user, gvAmtToWithdraw, depositBalance + earnedPower);
+        _withdrawFromPot(user, gvAmtToWithdraw, gvBalance);
 
         _updateDeposits(user, amount);
 
         _updateTotalSupply(gvAmtToWithdraw);
+
+        _updateDelegated(user, gvAmtToWithdraw, gvBalance);
 
         uint256 endTime = block.timestamp + withdrawalDelay;
         currRequest.endTime = uint32(endTime);
@@ -344,6 +347,26 @@ contract GvToken is IGvToken {
             _totalSupply = 0;
         } else {
             _totalSupply -= gvAmtToWithdraw;
+        }
+    }
+
+    function _updateDelegated(
+        address user,
+        uint256 withdrawAmt,
+        uint256 gvBalance
+    ) private {
+        uint256 remainingGvBal = gvBalance - withdrawAmt;
+        uint256 delegatedAmt = _delegated[user];
+        // this means we need to deduct delegated Amt
+        if (remainingGvBal < delegatedAmt) {
+            uint256 gvAmtToDeduct = delegatedAmt - remainingGvBal;
+            _delegated[user] -= gvAmtToDeduct;
+            _moveDelegates(
+                _delegates[msg.sender],
+                address(0),
+                gvAmtToDeduct,
+                0
+            );
         }
     }
 

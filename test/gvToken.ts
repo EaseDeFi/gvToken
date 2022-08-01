@@ -875,12 +875,99 @@ describe("GvToken", function () {
 
       // alice's checkpoint votes should be bob's balance
       expect(lastAliceCheckpoint.votes).to.equal(bobBalance);
-      // bob's delegated should be equal ot bob's balance
 
       const bobDelegated = await contracts.gvToken.delegated(bobAddress);
-      // delegated should update upto balance on latest delegate call
 
+      // bob's delegated should be equal ot bob's balance
       expect(bobDelegated).to.equal(bobBalance);
+    });
+    it("should update checkpoint on withdrawal", async function () {
+      // deposit
+      const depositAmount = parseEther("100");
+      await depositFor(signers.user, depositAmount);
+      // delegate
+      await contracts.gvToken.connect(signers.user).delegate(aliceAddress);
+      // check Delegated balance
+      const checkpointCountb4 = await contracts.gvToken.numCheckpoints(
+        aliceAddress
+      );
+      const withdrawAmount = parseEther("10");
+      const aliceCheckPointB4 = await contracts.gvToken.checkpoints(
+        aliceAddress,
+        checkpointCountb4 - 1
+      );
+
+      expect(aliceCheckPointB4.votes).to.gte(depositAmount);
+
+      // request withdraw
+      await expect(
+        contracts.gvToken.connect(signers.user).withdrawRequest(withdrawAmount)
+      ).to.emit(contracts.gvToken, "DelegateVotesChanged");
+
+      const checkpointCountAftr = await contracts.gvToken.numCheckpoints(
+        aliceAddress
+      );
+      expect(checkpointCountAftr - checkpointCountb4).to.equal(1);
+
+      const aliceCheckpointAftr = await contracts.gvToken.checkpoints(
+        aliceAddress,
+        checkpointCountAftr - 1
+      );
+      const votesDifference = aliceCheckPointB4.votes.sub(
+        aliceCheckpointAftr.votes
+      );
+      expect(votesDifference).to.gte(withdrawAmount);
+    });
+    it("should not update checkpoint on withdrawal", async function () {
+      // As we fast forward time before calling withdrawal request
+      // the user's votes should be grown by significant amount
+      // that small withdrawal will not result in writing new checkpoint
+
+      // deposit
+      const depositAmount = parseEther("100");
+      await depositFor(signers.user, depositAmount);
+      // delegate
+      await contracts.gvToken.connect(signers.user).delegate(aliceAddress);
+
+      // forward time
+      await fastForward(TIME_IN_SECS.month * 4);
+      await mine();
+
+      // check Delegated balance
+      const checkpointCountb4 = await contracts.gvToken.numCheckpoints(
+        aliceAddress
+      );
+      const withdrawAmount = parseEther("10");
+      const aliceCheckPointB4 = await contracts.gvToken.checkpoints(
+        aliceAddress,
+        checkpointCountb4 - 1
+      );
+
+      expect(aliceCheckPointB4.votes).to.gte(depositAmount);
+
+      // request withdraw
+      await expect(
+        contracts.gvToken.connect(signers.user).withdrawRequest(withdrawAmount)
+      ).to.not.emit(contracts.gvToken, "DelegateVotesChanged");
+
+      const checkpointCountAftr = await contracts.gvToken.numCheckpoints(
+        aliceAddress
+      );
+      // as amount being withdrawn is 10EASE and user's total gvEASE balance
+      // by now is more than 132gvEase, withdrawing 10 EASE will reduce
+      // total gvEase balance of user around 119 gvEASE which is more than
+      // delegated amount i.e (100 100 gvEASE)
+      expect(checkpointCountAftr - checkpointCountb4).to.equal(0);
+
+      const aliceCheckpointAftr = await contracts.gvToken.checkpoints(
+        aliceAddress,
+        checkpointCountAftr - 1
+      );
+      const votesDifference = aliceCheckPointB4.votes.sub(
+        aliceCheckpointAftr.votes
+      );
+      // as the delegates vote was not updated vote diff should be 0
+      expect(votesDifference).to.equal(0);
     });
   });
   describe("totalSupply()", function () {
