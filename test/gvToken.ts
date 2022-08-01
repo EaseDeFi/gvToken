@@ -908,4 +908,30 @@ describe("GvToken", function () {
       expect(totalSupply).to.equal(0);
     });
   });
+
+  describe("setTotalSupply()", function () {
+    it("should allow governance to update total supply only within bounds", async function () {
+      await expect(
+        contracts.gvToken.connect(signers.gov).setTotalSupply(1)
+      ).to.revertedWith("not in range");
+
+      // deposit fast forward and update
+      const depositAmount = parseEther("200");
+      await depositFor(signers.user, depositAmount);
+
+      await fastForward(TIME_IN_SECS.month * 2);
+      await mine();
+
+      // user deposit balance by this time should be at least
+      // grown by 30 gvEASE we update total supply using governance
+      const userBalance = await contracts.gvToken.balanceOf(userAddress);
+      await contracts.gvToken.connect(signers.gov).setTotalSupply(userBalance);
+
+      await expect(
+        contracts.gvToken
+          .connect(signers.gov)
+          .setTotalSupply(userBalance.sub(1000))
+      ).to.revertedWith("newAmount < existing");
+    });
+  });
 });

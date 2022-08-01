@@ -707,12 +707,17 @@ contract GvToken is IGvToken {
         withdrawalDelay = time;
     }
 
-    function setTotalSupply(uint256 amount) external onlyGov {
+    function setTotalSupply(uint256 newTotalSupply) external onlyGov {
         uint256 totalEaseDeposit = totalDeposited;
+
         require(
-            amount > totalEaseDeposit && amount < (totalEaseDeposit * 2),
+            newTotalSupply >= totalEaseDeposit &&
+                newTotalSupply <= (totalEaseDeposit * 2),
             "not in range"
         );
-        _totalSupply = amount;
+        // making sure governance can only update for the vote grown part
+        require(_totalSupply < newTotalSupply, "newAmount < existing");
+
+        _totalSupply = newTotalSupply;
     }
 }
