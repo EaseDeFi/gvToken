@@ -285,7 +285,6 @@ describe("BribePot", function () {
       ).to.revertedWith("bribe already exists");
     });
     it("should update period finish on new bribe", async function () {
-      //
       // call deposit
       const gvAmount = parseEther("100");
       await contracts.bribePot
@@ -311,6 +310,29 @@ describe("BribePot", function () {
       );
       const periodFinishAfter = await contracts.bribePot.periodFinish();
       expect(periodFinishAfter).to.equal(expectedTimeFinish);
+    });
+    it("should allow user to bribe without permit if allowance is enough", async function () {
+      // call deposit
+      const gvAmount = parseEther("100");
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(bobAddress, gvAmount);
+      // call bribe
+      const bribePerWeek = parseEther("10");
+      const numOfWeeks = 4;
+      // approve bribePot
+      await contracts.ease
+        .connect(signers.briber)
+        .approve(contracts.bribePot.address, bribePerWeek.mul(numOfWeeks));
+      // if this contract call doesn't fail we can be sure it worked
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, RCA_VAULT, numOfWeeks, {
+          deadline: 0,
+          v: 0,
+          r: ethers.constants.HashZero,
+          s: ethers.constants.HashZero,
+        });
     });
   });
   describe("cancelBribe()", function () {

@@ -137,8 +137,8 @@ contract GvToken is Delegable {
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
-    function deposit(uint256 amount, PermitArgs memory args) external {
-        _deposit(msg.sender, amount, block.timestamp, args, false);
+    function deposit(uint256 amount, PermitArgs memory permit) external {
+        _deposit(msg.sender, amount, block.timestamp, permit, false);
     }
 
     /// @notice Deposit for vArmor holders to give them
@@ -147,12 +147,12 @@ contract GvToken is Delegable {
     /// @param depositStart Extra time start for stakers of Armor Token
     /// as promised by EASE DAO when token migration from ARMOR to EASE
     /// @param proof Merkle proof of the vArmor staker
-    /// @param args v,r,s and deadline for signed approvals (EIP-2612)
+    /// @param permit v,r,s and deadline for signed approvals (EIP-2612)
     function deposit(
         uint256 amount,
         uint256 depositStart,
         bytes32[] memory proof,
-        PermitArgs memory args
+        PermitArgs memory permit
     ) external {
         address user = msg.sender;
         bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
@@ -160,7 +160,7 @@ contract GvToken is Delegable {
         require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
         require(depositStart >= genesis, "can't deposit before genesis");
 
-        _deposit(user, amount, depositStart, args, false);
+        _deposit(user, amount, depositStart, permit, false);
     }
 
     /// @notice Request redemption of gvToken back to ease
@@ -284,12 +284,12 @@ contract GvToken is Delegable {
         // bribe rewards from the pot
         uint256 amount;
 
-        PermitArgs memory args;
+        PermitArgs memory permit;
         if (bribedAmount[user] > 0) {
             amount = pot.getReward(user, false);
         }
         if (amount > 0) {
-            _deposit(user, amount, block.timestamp, args, true);
+            _deposit(user, amount, block.timestamp, permit, true);
         }
     }
 
@@ -446,14 +446,14 @@ contract GvToken is Delegable {
     ///@param amount Amount of EASE to deposit
     ///@param depositStart Start time of deposit(current timestamp
     /// for regular deposit and ahead timestart for vArmor holders)
-    ///@param args v,r,s and deadline for signed approvals (EIP-2612)
+    ///@param permit v,r,s and deadline for signed approvals (EIP-2612)
     ///@param fromBribePot boolean to represent if reward being deposited
     ///for compounding gvPower
     function _deposit(
         address user,
         uint256 amount,
         uint256 depositStart,
-        PermitArgs memory args,
+        PermitArgs memory permit,
         bool fromBribePot
     ) internal {
         require(amount > 0, "cannot deposit 0!");
@@ -466,7 +466,7 @@ contract GvToken is Delegable {
         // need to transfer EASE as it will already be transferred
         // to this contract address
         if (!fromBribePot) {
-            _tranferStakingToken(user, amount, args);
+            _transferStakingToken(user, amount, permit);
         }
 
         emit Deposited(user, amount);
@@ -488,21 +488,20 @@ contract GvToken is Delegable {
         _deposits[user].push(newDeposit);
     }
 
-    function _tranferStakingToken(
+    function _transferStakingToken(
         address from,
         uint256 amount,
-        PermitArgs memory args
+        PermitArgs memory permit
     ) internal {
-        uint256 allowed = stakingToken.allowance(from, address(this));
-        if (allowed < amount) {
+        if (permit.r != bytes32("")) {
             stakingToken.permit(
                 from,
                 address(this),
                 amount,
-                args.deadline,
-                args.v,
-                args.r,
-                args.s
+                permit.deadline,
+                permit.v,
+                permit.r,
+                permit.s
             );
         }
         stakingToken.safeTransferFrom(from, address(this), amount);

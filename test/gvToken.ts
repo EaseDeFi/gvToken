@@ -375,6 +375,29 @@ describe("GvToken", function () {
         withdrawAmt1.add(withdrawAmt2)
       );
     });
+    it("should not allow wallet without ease to deposit", async function () {
+      const amount = parseEther("100");
+      await expect(depositFor(signers.otherAccounts[0], amount)).to.reverted;
+    });
+    it("should allow user to deposit without permit if allowance is enough", async function () {
+      // approve gvToken to use ease on user's behalf
+      const depositAmount = parseEther("100");
+      await contracts.ease
+        .connect(signers.user)
+        .approve(contracts.gvToken.address, depositAmount);
+      // call deposit without permit args
+      const userGvBalBefore = await contracts.gvToken.balanceOf(userAddress);
+      await contracts.gvToken
+        .connect(signers.user)
+        ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](depositAmount, {
+          deadline: 0,
+          v: 0,
+          r: ethers.constants.HashZero,
+          s: ethers.constants.HashZero,
+        });
+      const userGvBalAfter = await contracts.gvToken.balanceOf(userAddress);
+      expect(userGvBalAfter.sub(userGvBalBefore)).to.gte(depositAmount);
+    });
   });
 
   describe("stake()", function () {

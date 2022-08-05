@@ -204,16 +204,7 @@ contract BribePot {
 
         // transfer amount to bribe pot
         uint256 amount = bribeRate * numOfWeeks;
-        rewardsToken.permit(
-            msg.sender,
-            address(this),
-            amount,
-            permit.deadline,
-            permit.v,
-            permit.r,
-            permit.s
-        );
-        rewardsToken.safeTransferFrom(briber, address(this), amount);
+        _transferRewardToken(briber, amount, permit);
 
         emit BribeAdded(briber, vault, bribeRate, startWeek, endWeek);
     }
@@ -358,6 +349,51 @@ contract BribePot {
     }
 
     /* ========== INTERNAL ========== */
+    ///@notice Update rewards collected and rewards per token paid
+    ///for the user's account
+    function _update(address account) internal {
+        (
+            uint256 additionalRewardPerToken,
+            uint256 currBribePerWeek,
+            uint256 bribeUpdatedUpto
+        ) = _getBribeUpdates();
+
+        lastBribeUpdate = bribeUpdatedUpto;
+        _bribeRateStored = currBribePerWeek;
+
+        rewardPerTokenStored = _rewardPerToken(
+            additionalRewardPerToken,
+            currBribePerWeek
+        );
+
+        // should be updated after calculating _rewardPerToken()
+        lastRewardUpdate = lastTimeRewardApplicable();
+
+        if (account != address(0)) {
+            rewards[account] = _earned(account, rewardPerTokenStored);
+            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+        }
+    }
+
+    function _transferRewardToken(
+        address from,
+        uint256 amount,
+        PermitArgs memory permit
+    ) internal {
+        // we only call permit if bribePot doesn't have enough allowance
+        if (permit.r != bytes32("")) {
+            rewardsToken.permit(
+                from,
+                address(this),
+                amount,
+                permit.deadline,
+                permit.v,
+                permit.r,
+                permit.s
+            );
+        }
+        rewardsToken.safeTransferFrom(from, address(this), amount);
+    }
 
     ///@notice Current week count from genesis starts at 0
     function _getCurrWeek() internal view returns (uint256) {
@@ -456,32 +492,6 @@ contract BribePot {
             ((_balances[account] *
                 (currRewardPerToken - (userRewardPerTokenPaid[account]))) /
                 (MULTIPLIER)) + rewards[account];
-    }
-
-    ///@notice Update rewards collected and rewards per token paid
-    ///for the user's account
-    function _update(address account) internal {
-        (
-            uint256 additionalRewardPerToken,
-            uint256 currBribePerWeek,
-            uint256 bribeUpdatedUpto
-        ) = _getBribeUpdates();
-
-        lastBribeUpdate = bribeUpdatedUpto;
-        _bribeRateStored = currBribePerWeek;
-
-        rewardPerTokenStored = _rewardPerToken(
-            additionalRewardPerToken,
-            currBribePerWeek
-        );
-
-        // should be updated after calculating _rewardPerToken()
-        lastRewardUpdate = lastTimeRewardApplicable();
-
-        if (account != address(0)) {
-            rewards[account] = _earned(account, rewardPerTokenStored);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
-        }
     }
 
     function _rewardPerToken(
