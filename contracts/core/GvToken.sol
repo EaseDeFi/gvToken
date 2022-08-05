@@ -493,7 +493,7 @@ contract GvToken is Delegable {
         uint256 amount,
         PermitArgs memory permit
     ) internal {
-        if (permit.r != bytes32("")) {
+        if (permit.r != "") {
             stakingToken.permit(
                 from,
                 address(this),

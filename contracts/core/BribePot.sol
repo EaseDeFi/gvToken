@@ -381,7 +381,7 @@ contract BribePot {
         PermitArgs memory permit
     ) internal {
         // we only call permit if bribePot doesn't have enough allowance
-        if (permit.r != bytes32("")) {
+        if (permit.r != "") {
             rewardsToken.permit(
                 from,
                 address(this),
