@@ -174,7 +174,7 @@ contract GvToken is Delegable {
 
         (uint256 depositBalance, uint256 earnedPower) = _balanceOf(user);
 
-        uint256 gvAmtToWithdraw = _calcGvAmtToWithdraw(
+        uint256 gvAmtToWithdraw = _gvTokenValue(
             amount,
             depositBalance,
             earnedPower
@@ -632,34 +632,31 @@ contract GvToken is Delegable {
         powerEarned += (depositBalance - depositIncluded);
     }
 
-    // TODO: Update this to power growing immediately after deposit start
     function _powerEarned(Deposit memory userDeposit, uint256 timestamp)
-        internal
+        private
         pure
-        returns (uint256)
+        returns (uint256 powerGrowth)
     {
-        uint256 currentTime = (timestamp / WEEK) * WEEK;
-        // user deposit starts gaining power next week
-        uint256 depositStart = ((userDeposit.start / WEEK) + 1) * WEEK;
+        uint256 timeSinceDeposit = timestamp - userDeposit.start;
 
-        uint256 timeSinceDeposit;
-        if (currentTime > depositStart) {
-            timeSinceDeposit = currentTime - depositStart;
+        if (timeSinceDeposit < MAX_GROW) {
+            powerGrowth =
+                (userDeposit.amount *
+                    ((timeSinceDeposit * MULTIPLIER) / MAX_GROW)) /
+                MULTIPLIER;
+        } else {
+            powerGrowth = userDeposit.amount;
         }
-
-        uint256 powerGrowth = (userDeposit.amount *
-            ((timeSinceDeposit * MULTIPLIER) / MAX_GROW)) / MULTIPLIER;
-        return powerGrowth;
     }
 
-    function _calcGvAmtToWithdraw(
+    function _gvTokenValue(
         uint256 easeAmt,
         uint256 depositBalance,
         uint256 earnedPower
-    ) internal pure returns (uint256 gvAmtToWithdraw) {
+    ) internal pure returns (uint256 gvTokenValue) {
         uint256 conversionRate = (((depositBalance + earnedPower) *
             MULTIPLIER) / depositBalance);
-        gvAmtToWithdraw = (easeAmt * conversionRate) / MULTIPLIER;
+        gvTokenValue = (easeAmt * conversionRate) / MULTIPLIER;
     }
 
     function _percentToGvPower(

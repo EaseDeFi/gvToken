@@ -138,8 +138,19 @@ describe("GvToken", function () {
       });
   }
 
+  describe("#initialState", function () {
+    it("should return correct name", async function () {
+      expect(await contracts.gvToken.name()).to.equal("Growing Vote Ease");
+    });
+    it("should return correct symbol", async function () {
+      expect(await contracts.gvToken.symbol()).to.equal("gvEase");
+    });
+    it("should return correct decimals", async function () {
+      expect(await contracts.gvToken.decimals()).to.equal(18);
+    });
+  });
   describe("restricted", function () {
-    it("should not allow other address to call functions", async function () {
+    it("should not allow other address to call restricted functions", async function () {
       await expect(contracts.gvToken.setPower(randomBytes(32))).to.revertedWith(
         "only gov"
       );
@@ -590,15 +601,8 @@ describe("GvToken", function () {
       await contracts.gvToken.connect(signers.bob).depositToPot(value);
       await bribeFor(signers.briber, parseEther("10"), 2);
 
-      // forward beyond 2nd week
-      const genesis = await contracts.bribePot.genesis();
-      const timeNeededToReachWeek1 = genesis
-        .add(TIME_IN_SECS.week)
-        .sub(await getTimestamp());
-      // move beyond week2
-      await fastForward(
-        timeNeededToReachWeek1.add(TIME_IN_SECS.week).toNumber()
-      );
+      // Move a week forward
+      await fastForward(TIME_IN_SECS.week);
       await mine();
     });
     it("should withdraw from pot if withdraw amount is > available gvEASE", async function () {
@@ -916,7 +920,12 @@ describe("GvToken", function () {
       const votesDifference = aliceCheckPointB4.votes.sub(
         aliceCheckpointAftr.votes
       );
-      expect(votesDifference).to.gte(withdrawAmount);
+      // as there are few transactions in between and timestamp should
+      // have slightly moved forward by now, user's gvPower should
+      // have grown by small amount even withdraw request of 10% of
+      // user deposit will not change votes by exactly 10 EASE it will
+      // be 9.99999 EASE
+      expect(votesDifference).to.gte(parseEther("9.9999"));
     });
     it("should not update checkpoint on withdrawal", async function () {
       // As we fast forward time before calling withdrawal request
@@ -1018,7 +1027,7 @@ describe("GvToken", function () {
         contracts.gvToken
           .connect(signers.gov)
           .setTotalSupply(userBalance.sub(1000))
-      ).to.revertedWith("newAmount < existing");
+      ).to.revertedWith("existing > new amount");
     });
   });
 });
