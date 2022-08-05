@@ -6,7 +6,7 @@
 2. Install dependencies `cd gvToken` && `npm install`
 3. Change `.env.example` to `.env` and update the variables
 4. Compile contracts - `npm run compile`
-5. Run tests - `npm test`
+5. Run tests - `npm test` (*Make sure the block number in `.env` is 14740073*)
 6. Deploy contracts:-
 	* Forked Mainnet Hardhat: `npx hardhat run scripts/deploy.ts`
 	* Locally Forked Node: `npx hardhat node` && `npx hardhat run scripts/deploy.ts --network localhost`

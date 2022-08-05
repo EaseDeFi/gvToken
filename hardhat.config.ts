@@ -11,6 +11,7 @@ import { resolve } from "path";
 import { config as dotenvConfig } from "dotenv";
 import { HardhatUserConfig } from "hardhat/config";
 import { NetworkUserConfig } from "hardhat/types";
+import { getForkingBlockNumber } from "./env_helpers";
 
 dotenvConfig({ path: resolve(__dirname, "./.env") });
 
@@ -101,7 +102,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: forkingURL ?? "",
-        blockNumber: 14740073,
+        blockNumber: getForkingBlockNumber(),
         enabled: !!forking,
       },
       accounts: {
