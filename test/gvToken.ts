@@ -1,12 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-import {
-  formatEther,
-  getContractAddress,
-  parseEther,
-  randomBytes,
-} from "ethers/lib/utils";
+import { getContractAddress, parseEther, randomBytes } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import {
   BribePot__factory,
