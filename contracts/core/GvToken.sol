@@ -158,7 +158,7 @@ contract GvToken is Delegable {
         bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
 
         require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
-        require(depositStart >= genesis, "can't deposit before genesis");
+        require(depositStart >= genesis, "depositStart > genesis");
 
         _deposit(user, amount, depositStart, permit, false);
     }

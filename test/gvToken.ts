@@ -1,7 +1,12 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-import { getContractAddress, parseEther, randomBytes } from "ethers/lib/utils";
+import {
+  formatEther,
+  getContractAddress,
+  parseEther,
+  randomBytes,
+} from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import {
   BribePot__factory,
@@ -163,6 +168,30 @@ describe("GvToken", function () {
         "cannot deposit 0!"
       );
     });
+    it("should fail if wrong permit sig is used", async function () {
+      const depositAmt = parseEther("100");
+      const deadline = (await getTimestamp()).add(1000);
+      const spender = contracts.gvToken.address;
+      // get permit signature with user as a signer
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.user,
+        token: contracts.ease,
+        value: depositAmt,
+        deadline,
+        spender,
+      });
+      // call deposit with alice's wallet with bob's permit sig
+      await expect(
+        contracts.gvToken
+          .connect(signers.alice)
+          ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](depositAmt, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.revertedWith("INVALID_SIGNER");
+    });
     it("should deposit ease and recieve gv Power", async function () {
       const value = parseEther("100");
       const deadline = (await getTimestamp()).add(1000);
@@ -214,88 +243,156 @@ describe("GvToken", function () {
       // total ease deposit
       expect(await contracts.gvToken.totalDeposited()).to.equal(value.mul(2));
     });
-
-    it("should allow vArmor holders to deposit", async function () {
-      // complete this anon
-      const bobValue = parseEther("1000");
-      const bobDepositStart = (await getTimestamp()).sub(TIME_IN_SECS.month);
-      const aliceValue = parseEther("1200");
-      const aliceDepositStart = (await getTimestamp()).sub(
-        TIME_IN_SECS.month * 3
-      );
-      const powerTree = new BalanceTree([
-        { account: bobAddress, amount: bobValue, powerEarned: bobDepositStart },
-        {
-          account: aliceAddress,
-          amount: aliceValue,
-          powerEarned: aliceDepositStart,
-        },
-      ]);
-      const deadline = (await getTimestamp()).add(1000);
-      const spender = contracts.gvToken.address;
-      // set root
-      const root = powerTree.getHexRoot();
-      await contracts.gvToken.connect(signers.gov).setPower(root);
-      // Bob deposit
-      const bobProof = powerTree.getProof(
-        bobAddress,
-        bobValue,
-        bobDepositStart
-      );
-      let { v, r, s } = await getPermitSignature({
-        signer: signers.bob,
-        token: contracts.ease,
-        value: bobValue,
-        deadline,
-        spender,
+    describe("#vArmor", function () {
+      let bobValue: BigNumber;
+      let bobDepositStart: BigNumber;
+      let aliceValue: BigNumber;
+      let aliceDepositStart: BigNumber;
+      let userValue: BigNumber;
+      let userDepositStart: BigNumber;
+      let powerTree: BalanceTree;
+      beforeEach(async function () {
+        // complete this anon
+        bobValue = parseEther("1000");
+        bobDepositStart = (await getTimestamp()).sub(TIME_IN_SECS.month);
+        aliceValue = parseEther("1200");
+        aliceDepositStart = (await getTimestamp()).sub(TIME_IN_SECS.month * 3);
+        userValue = parseEther("800");
+        // using userDeposit start before genesis to revert when called deposit
+        // using this proof
+        userDepositStart = BigNumber.from(
+          (await contracts.gvToken.genesis()) - 1000
+        );
+        powerTree = new BalanceTree([
+          {
+            account: bobAddress,
+            amount: bobValue,
+            depositStart: bobDepositStart,
+          },
+          {
+            account: aliceAddress,
+            amount: aliceValue,
+            depositStart: aliceDepositStart,
+          },
+          {
+            account: userAddress,
+            amount: userValue,
+            depositStart: userDepositStart,
+          },
+        ]);
+        const root = powerTree.getHexRoot();
+        await contracts.gvToken.connect(signers.gov).setPower(root);
       });
-      // check for emit too
-      await expect(
-        contracts.gvToken
-          .connect(signers.bob)
+      it("should fail if wrong proof is provided by vArmor holder", async function () {
+        // Bob deposit
+        const deadline = (await getTimestamp()).add(1000);
+        const spender = contracts.gvToken.address;
+        const aliceProof = powerTree.getProof(
+          aliceAddress,
+          aliceValue,
+          aliceDepositStart
+        );
+        const { v, r, s } = await getPermitSignature({
+          signer: signers.bob,
+          token: contracts.ease,
+          value: bobValue,
+          deadline,
+          spender,
+        });
+        // check for emit too
+        await expect(
+          contracts.gvToken
+            .connect(signers.bob)
+            [
+              "deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"
+            ](bobValue, bobDepositStart, aliceProof, { v, r, s, deadline })
+        ).to.reverted;
+      });
+      it("should fail if depositStart is before genesis", async function () {
+        const deadline = (await getTimestamp()).add(1000);
+        const spender = contracts.gvToken.address;
+        const userProof = powerTree.getProof(
+          userAddress,
+          userValue,
+          userDepositStart
+        );
+        const { v, r, s } = await getPermitSignature({
+          signer: signers.user,
+          token: contracts.ease,
+          value: userValue,
+          deadline,
+          spender,
+        });
+        // check for emit too
+        await expect(
+          contracts.gvToken
+            .connect(signers.user)
+            [
+              "deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"
+            ](userValue, userDepositStart, userProof, { v, r, s, deadline })
+        ).to.revertedWith("depositStart > genesis");
+      });
+      it("should allow vArmor holders to deposit", async function () {
+        // Bob deposit
+        const deadline = (await getTimestamp()).add(1000);
+        const spender = contracts.gvToken.address;
+        // set root
+        const bobProof = powerTree.getProof(
+          bobAddress,
+          bobValue,
+          bobDepositStart
+        );
+        let { v, r, s } = await getPermitSignature({
+          signer: signers.bob,
+          token: contracts.ease,
+          value: bobValue,
+          deadline,
+          spender,
+        });
+        // check for emit too
+        await expect(
+          contracts.gvToken
+            .connect(signers.bob)
+            [
+              "deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"
+            ](bobValue, bobDepositStart, bobProof, { v, r, s, deadline })
+        )
+          .to.emit(contracts.gvToken, "Deposited")
+          .withArgs(bobAddress, bobValue);
+
+        const bobGvBal = await contracts.gvToken.balanceOf(bobAddress);
+
+        expect(bobGvBal).to.gt(bobValue.add(parseEther("10")));
+
+        // Alice Deposit
+        const aliceProof = powerTree.getProof(
+          aliceAddress,
+          aliceValue,
+          aliceDepositStart
+        );
+        // update v,r,s for alice
+        // I didn't know we could destructure like this
+        ({ v, r, s } = await getPermitSignature({
+          signer: signers.alice,
+          token: contracts.ease,
+          value: aliceValue,
+          deadline,
+          spender,
+        }));
+        const aliceEaseBalBefore = await contracts.ease.balanceOf(aliceAddress);
+        await contracts.gvToken
+          .connect(signers.alice)
           [
             "deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"
-          ](bobValue, bobDepositStart, bobProof, { v, r, s, deadline })
-      )
-        .to.emit(contracts.gvToken, "Deposited")
-        .withArgs(bobAddress, bobValue);
-
-      const bobGvBal = await contracts.gvToken.balanceOf(bobAddress);
-
-      expect(bobGvBal).to.gt(bobValue.add(parseEther("10")));
-
-      // Alice Deposit
-      const aliceProof = powerTree.getProof(
-        aliceAddress,
-        aliceValue,
-        aliceDepositStart
-      );
-      // update v,r,s for alice
-      // I didn't know we could destructure like this
-      ({ v, r, s } = await getPermitSignature({
-        signer: signers.alice,
-        token: contracts.ease,
-        value: aliceValue,
-        deadline,
-        spender,
-      }));
-      const aliceEaseBalBefore = await contracts.ease.balanceOf(aliceAddress);
-      await contracts.gvToken
-        .connect(signers.alice)
-        ["deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"](
-          aliceValue,
-          aliceDepositStart,
-          aliceProof,
-          { v, r, s, deadline }
-        );
-      const aliceEaseBalAfter = await contracts.ease.balanceOf(aliceAddress);
-      const alicePower = await contracts.gvToken.balanceOf(aliceAddress);
-      expect(alicePower).to.gt(aliceValue.add(parseEther("10")));
-      // check ease balance
-      expect(aliceEaseBalBefore.sub(aliceEaseBalAfter)).to.equal(aliceValue);
+          ](aliceValue, aliceDepositStart, aliceProof, { v, r, s, deadline });
+        const aliceEaseBalAfter = await contracts.ease.balanceOf(aliceAddress);
+        const alicePower = await contracts.gvToken.balanceOf(aliceAddress);
+        expect(alicePower).to.gt(aliceValue.add(parseEther("10")));
+        // check ease balance
+        expect(aliceEaseBalBefore.sub(aliceEaseBalAfter)).to.equal(aliceValue);
+      });
     });
     it("should deposit multiple times and allow user to bribe,stake,and withdraw ", async function () {
-      //
       const value = parseEther("10");
       let deadline = (await getTimestamp()).add(1000);
       const initialDepositCount = 50;
@@ -628,6 +725,12 @@ describe("GvToken", function () {
       await fastForward(TIME_IN_SECS.week);
       await mine();
     });
+    it("should fail if withdraw amount is greater than deposited amount", async function () {
+      const amount = parseEther("200");
+      await expect(
+        contracts.gvToken.connect(signers.user).withdrawRequest(amount)
+      ).to.revertedWith("not enough deposit!");
+    });
     it("should withdraw from pot if withdraw amount is > available gvEASE", async function () {
       const amount = parseEther("60");
 
@@ -641,6 +744,33 @@ describe("GvToken", function () {
       expect(bribedAmtBefore.sub(bribedAmtAfter)).to.gt(
         expectedReductionInBribeAmt
       );
+    });
+    it("should update totalSupply correctly", async function () {
+      // as gvEase contracts has 2 deposits of 200 ease worth in total
+      // the total supply of gvEase will remain 200 gvEASE as there is
+      // no mechanism in gvToken contract to take into account of the
+      // grown votes. For that case we have setTotalSupply function
+      // which can be called by governance if there's a need to.
+      // if the amount of gvEASE being withdrawn is greater than total
+      // supply the contract set's total supply to zero
+
+      const amount = parseEther("100");
+      let totalSupplyBefore = await contracts.gvToken.totalSupply();
+      // user withdraw request
+      await contracts.gvToken.connect(signers.user).withdrawRequest(amount);
+      let totalSupplyAfter = await contracts.gvToken.totalSupply();
+      // after one week of deposit gvPower removed from total supply
+      // should be greater than withdrawn amount
+      expect(totalSupplyBefore.sub(totalSupplyAfter)).to.gt(amount);
+
+      // bob withdraw request
+      // on bob withdraw request even though bob's balance is greater
+      // than gvEase total supply at this moment the contract set's total
+      // supply to zero to not cause underflow.
+      totalSupplyBefore = await contracts.gvToken.totalSupply();
+      await contracts.gvToken.connect(signers.bob).withdrawRequest(amount);
+      totalSupplyAfter = await contracts.gvToken.totalSupply();
+      expect(totalSupplyAfter).to.equal(0);
     });
     it("should emit RedeemRequest event", async function () {
       // check for emit
