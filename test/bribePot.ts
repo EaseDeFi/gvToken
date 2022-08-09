@@ -45,7 +45,7 @@ describe("BribePot", function () {
       nonce,
     });
 
-    contracts.ease = await EaseTokenFactory.deploy(signers.gvToken.address);
+    contracts.ease = await EaseTokenFactory.deploy();
 
     contracts.bribePot = await BribePotFactory.deploy(
       signers.gvToken.address,
@@ -55,16 +55,16 @@ describe("BribePot", function () {
     // fund user accounts with EASE token
     await contracts.ease
       .connect(signers.gvToken)
-      .mint(bobAddress, parseEther("1000000"));
+      .transfer(bobAddress, parseEther("1000000"));
     await contracts.ease
       .connect(signers.gvToken)
-      .mint(aliceAddress, parseEther("1000000"));
+      .transfer(aliceAddress, parseEther("1000000"));
     await contracts.ease
       .connect(signers.gvToken)
-      .mint(signers.gvToken.address, parseEther("1000000"));
+      .transfer(signers.gvToken.address, parseEther("1000000"));
     await contracts.ease
       .connect(signers.gvToken)
-      .mint(briberAddress, parseEther("1000000"));
+      .transfer(briberAddress, parseEther("1000000"));
   });
 
   describe("restricted", function () {

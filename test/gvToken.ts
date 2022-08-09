@@ -30,7 +30,8 @@ describe("GvToken", function () {
     signers.alice = accounts[3];
     signers.bob = accounts[4];
     signers.briber = accounts[5];
-    signers.otherAccounts = accounts.slice(6);
+    signers.easeDeployer = accounts[6];
+    signers.otherAccounts = accounts.slice(7);
     // fill in address
     userAddress = signers.user.address;
     bobAddress = signers.bob.address;
@@ -48,21 +49,21 @@ describe("GvToken", function () {
       await ethers.getContractFactory("BribePot")
     );
 
-    const nonce = await signers.user.getTransactionCount();
-    const easeAddress = getContractAddress({
-      from: signers.user.address,
-      nonce,
-    });
+    const userNonce = await signers.user.getTransactionCount();
     const gvTokenAddress = getContractAddress({
       from: signers.user.address,
-      nonce: nonce + 1,
+      nonce: userNonce,
     });
     const bribePotAddress = getContractAddress({
       from: signers.user.address,
-      nonce: nonce + 2,
+      nonce: userNonce + 1,
     });
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
-    contracts.ease = await EaseTokenFactory.deploy(signers.user.address);
+    contracts.ease = await EaseTokenFactory.connect(
+      signers.easeDeployer
+    ).deploy();
+    const easeAddress = contracts.ease.address;
+
     contracts.gvToken = await GvTokenFactory.deploy(
       bribePotAddress,
       easeAddress,
@@ -70,6 +71,7 @@ describe("GvToken", function () {
       signers.gov.address,
       GENESIS
     );
+
     contracts.bribePot = await BribePotFactory.deploy(
       gvTokenAddress,
       easeAddress,
@@ -77,17 +79,17 @@ describe("GvToken", function () {
     );
     // fund user accounts with EASE token
     await contracts.ease
-      .connect(signers.user)
-      .mint(bobAddress, parseEther("1000000"));
+      .connect(signers.easeDeployer)
+      .transfer(bobAddress, parseEther("1000000"));
     await contracts.ease
-      .connect(signers.user)
-      .mint(aliceAddress, parseEther("1000000"));
+      .connect(signers.easeDeployer)
+      .transfer(aliceAddress, parseEther("1000000"));
     await contracts.ease
-      .connect(signers.user)
-      .mint(userAddress, parseEther("1000000"));
+      .connect(signers.easeDeployer)
+      .transfer(userAddress, parseEther("1000000"));
     await contracts.ease
-      .connect(signers.user)
-      .mint(briberAddress, parseEther("1000000"));
+      .connect(signers.easeDeployer)
+      .transfer(briberAddress, parseEther("1000000"));
   });
 
   async function depositFor(user: SignerWithAddress, value: BigNumber) {

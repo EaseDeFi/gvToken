@@ -11,6 +11,7 @@ export type Contracts = {
   bribePot: BribePot;
 };
 export type Signers = {
+  easeDeployer: SignerWithAddress;
   user: SignerWithAddress;
   alice: SignerWithAddress;
   bob: SignerWithAddress;
