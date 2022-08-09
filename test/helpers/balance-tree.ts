@@ -4,11 +4,11 @@ import { BigNumber, utils } from "ethers";
 export default class BalanceTree {
   private readonly tree: MerkleTree;
   constructor(
-    balances: { account: string; amount: BigNumber; powerEarned: BigNumber }[]
+    balances: { account: string; amount: BigNumber; depositStart: BigNumber }[]
   ) {
     this.tree = new MerkleTree(
-      balances.map(({ account, amount, powerEarned }) => {
-        return BalanceTree.toNode(account, amount, powerEarned);
+      balances.map(({ account, amount, depositStart }) => {
+        return BalanceTree.toNode(account, amount, depositStart);
       })
     );
   }
@@ -16,11 +16,11 @@ export default class BalanceTree {
   public static verifyProof(
     account: string,
     amount: BigNumber,
-    powerEarned: BigNumber,
+    depositStart: BigNumber,
     proof: Buffer[],
     root: Buffer
   ): boolean {
-    let pair = BalanceTree.toNode(account, amount, powerEarned);
+    let pair = BalanceTree.toNode(account, amount, depositStart);
     for (const item of proof) {
       pair = MerkleTree.combinedHash(pair, item);
     }
@@ -32,13 +32,13 @@ export default class BalanceTree {
   public static toNode(
     account: string,
     amount: BigNumber,
-    powerEarned: BigNumber
+    depositStart: BigNumber
   ): Buffer {
     return Buffer.from(
       utils
         .solidityKeccak256(
           ["address", "uint256", "uint256"],
-          [account, amount, powerEarned]
+          [account, amount, depositStart]
         )
         .slice(2),
       "hex"
@@ -53,10 +53,10 @@ export default class BalanceTree {
   public getProof(
     account: string,
     amount: BigNumber,
-    powerEarned: BigNumber
+    depositStart: BigNumber
   ): string[] {
     return this.tree.getHexProof(
-      BalanceTree.toNode(account, amount, powerEarned)
+      BalanceTree.toNode(account, amount, depositStart)
     );
   }
 }
