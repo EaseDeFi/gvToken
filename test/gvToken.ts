@@ -64,7 +64,15 @@ describe("GvToken", function () {
     ).deploy();
     const easeAddress = contracts.ease.address;
 
-    contracts.gvToken = await GvTokenFactory.deploy(
+    contracts.gvToken = await GvTokenFactory.deploy();
+    contracts.bribePot = await BribePotFactory.deploy(
+      gvTokenAddress,
+      easeAddress,
+      RCA_CONTROLLER
+    );
+
+    // Initialize gvToken
+    await contracts.gvToken.initialize(
       bribePotAddress,
       easeAddress,
       RCA_CONTROLLER,
@@ -72,11 +80,6 @@ describe("GvToken", function () {
       GENESIS
     );
 
-    contracts.bribePot = await BribePotFactory.deploy(
-      gvTokenAddress,
-      easeAddress,
-      RCA_CONTROLLER
-    );
     // fund user accounts with EASE token
     await contracts.ease
       .connect(signers.easeDeployer)

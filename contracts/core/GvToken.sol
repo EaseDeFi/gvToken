@@ -2,6 +2,9 @@
 pragma solidity 0.8.11;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "../interfaces/IERC20.sol";
 import "../interfaces/IGvToken.sol";
@@ -14,8 +17,14 @@ import "./Delegable.sol";
 // solhint-disable reason-string
 // solhint-disable max-states-count
 // solhint-disable no-inline-assembly
+// solhint-disable no-empty-blocks
 
-contract GvToken is Delegable {
+contract GvToken is
+    Delegable,
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable
+{
     using SafeERC20 for IERC20Permit;
 
     /* ========== STRUCTS ========== */
@@ -58,11 +67,11 @@ contract GvToken is Delegable {
     uint256 internal constant MULTIPLIER = 1e18;
 
     /* ========== STATE ========== */
-    IBribePot public immutable pot;
-    IERC20Permit public immutable stakingToken;
-    IRcaController public immutable rcaController;
+    IBribePot public pot;
+    IERC20Permit public stakingToken;
+    IRcaController public rcaController;
     /// @notice Timestamp rounded in weeks for earliest vArmor staker
-    uint32 public immutable genesis;
+    uint32 public genesis;
     /// @notice ease governance
     address public gov;
     /// @notice total amount of EASE deposited
@@ -113,8 +122,8 @@ contract GvToken is Delegable {
         _;
     }
 
-    /* ========== CONSTRUCTOR ========== */
-    /// @notice Construct a new gvToken.
+    /* ========== INITIALIZE ========== */
+    /// @notice Initialize a new gvToken.
     /// @param _pot Address of a bribe pot.
     /// @param _stakingToken Address of a token to be deposited in exchange
     /// of Growing vote token.
@@ -122,13 +131,13 @@ contract GvToken is Delegable {
     /// active rca vaults.
     /// @param _gov Governance Addresss.
     /// @param _genesis Deposit time of first vArmor holder.
-    constructor(
+    function initialize(
         address _pot,
         address _stakingToken,
         address _rcaController,
         address _gov,
         uint256 _genesis
-    ) {
+    ) external initializer {
         pot = IBribePot(_pot);
         stakingToken = IERC20Permit(_stakingToken);
         rcaController = IRcaController(_rcaController);
@@ -439,6 +448,8 @@ contract GvToken is Delegable {
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     ///@notice Deposit EASE to obtain gvToken that grows upto
     ///twice the amount of ease being deposited.
