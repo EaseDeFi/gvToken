@@ -88,7 +88,7 @@ async function main() {
   console.log({ tokenSwapAddress });
   // deploy ease token
   contracts.ease = <EaseToken>(
-    await EASE_TOKEN_FACTORY.connect(signers.user).deploy(tokenSwapAddress)
+    await EASE_TOKEN_FACTORY.connect(signers.user).deploy()
   );
   await contracts.ease.deployed();
   console.log(`Ease Token deployed at ${contracts.ease.address}`);
@@ -120,7 +120,8 @@ async function main() {
   await contracts.bribePot.deployed();
   console.log(`Bribe Pot deployed at ${contracts.bribePot.address}`);
   console.log({ bribePotAddress });
-
+  // Fund tokenswap with ease token
+  await contracts.ease.transfer(tokenSwapAddress, parseEther("1000000"));
   async function depositStakeBribe() {
     // swap armor for ease
     // approve armor

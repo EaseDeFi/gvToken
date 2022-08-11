@@ -7,6 +7,7 @@ import "../interfaces/IEaseToken.sol";
 import "../interfaces/IVArmor.sol";
 
 contract TokenSwap {
+    address private constant DEAD = address(0xdEaD);
     IEaseToken public immutable ease;
     IERC20 public immutable armor;
     IVArmor public immutable vArmor;
@@ -22,14 +23,14 @@ contract TokenSwap {
     }
 
     function swap(uint256 amount) external {
-        ease.mint(msg.sender, amount);
-        armor.transferFrom(msg.sender, address(0xdEaD), amount);
+        ease.transfer(msg.sender, amount);
+        armor.transferFrom(msg.sender, DEAD, amount);
     }
 
     function swapVArmor(uint256 amount) external {
         // TODO: can we fix conversion rate at certain period in time to make this cheaper?
         uint256 armorAmount = vArmor.vArmorToArmor(amount);
-        ease.mint(msg.sender, armorAmount);
-        vArmor.transferFrom(msg.sender, address(0xdEaD), amount);
+        ease.transfer(msg.sender, armorAmount);
+        vArmor.transferFrom(msg.sender, DEAD, amount);
     }
 }

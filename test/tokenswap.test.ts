@@ -80,8 +80,11 @@ describe("TokenSwap", function () {
       )
     );
     contracts.ease = <EaseToken>(
-      await EASE_TOKEN_FACTORY.connect(signers.user).deploy(tokenSwapAddress)
+      await EASE_TOKEN_FACTORY.connect(signers.user).deploy()
     );
+    await contracts.ease
+      .connect(signers.user)
+      .transfer(tokenSwapAddress, parseEther("100000000"));
   });
   describe("Initialize", function () {
     it("should initialize contract properly", async function () {
@@ -161,27 +164,35 @@ describe("EaseToken", function () {
     );
 
     contracts.ease = <EaseToken>(
-      await EASE_TOKEN_FACTORY.connect(signers.user).deploy(
-        signers.user.address
-      )
+      await EASE_TOKEN_FACTORY.connect(signers.user).deploy()
     );
   });
 
-  describe("mint()", function () {
-    it("should allow minter to mint the token", async function () {
-      const amount = parseEther("1000");
-      const userAddress = signers.user.address;
-      const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
-      await contracts.ease.connect(signers.user).mint(userAddress, amount);
-      const userEaseBalAfter = await contracts.ease.balanceOf(userAddress);
-      expect(userEaseBalAfter.sub(userEaseBalBefore)).to.be.equal(amount);
+  describe("#initialState", function () {
+    it("should set correct metadata", async function () {
+      expect(await contracts.ease.name()).to.equal("Ease Token");
+      expect(await contracts.ease.symbol()).to.equal("EASE");
     });
-    it("should not allow non minter to mint ease token", async function () {
-      const amount = parseEther("1000");
+    it("should mint total supply to the deployer", async function () {
       const userAddress = signers.user.address;
-      await expect(
-        contracts.ease.connect(signers.gov).mint(userAddress, amount)
-      ).to.revertedWith("only minter");
+      const totalSupply = await contracts.ease.totalSupply();
+      const expectedTotalSupply = parseEther("750000000");
+
+      expect(totalSupply).to.equal(expectedTotalSupply);
+
+      const deployerBalance = await contracts.ease.balanceOf(userAddress);
+
+      expect(deployerBalance).to.equal(expectedTotalSupply);
+    });
+  });
+  describe("burn()", function () {
+    it("should allow user to burn ease tokens", async function () {
+      const userAddress = signers.user.address;
+      const burnAmt = parseEther("1000");
+      const balanceBefore = await contracts.ease.balanceOf(userAddress);
+      await contracts.ease.connect(signers.user).burn(burnAmt);
+      const balanceAfter = await contracts.ease.balanceOf(userAddress);
+      expect(balanceBefore.sub(balanceAfter)).to.equal(burnAmt);
     });
   });
 });
