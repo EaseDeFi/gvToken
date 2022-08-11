@@ -125,6 +125,25 @@ describe("TokenSwap", function () {
         easeTokensToMint
       );
     });
+    it("should allow other users to swap on vArmor for EASE on holders behalf", async function () {
+      const userAddress = signers.user.address;
+      const amount = parseEther("1000");
+      await contracts.vArmor
+        .connect(signers.user)
+        .approve(contracts.tokenSwap.address, amount);
+      // amount of ease the user will recieve
+      const easeTokensToMint = await contracts.vArmor.vArmorToArmor(amount);
+
+      const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
+      // swap vArmor on behalf or a user
+      await contracts.tokenSwap
+        .connect(signers.otherAccounts[0])
+        .swapVArmorFor(userAddress, amount);
+      const userEaseBalAfter = await contracts.ease.balanceOf(userAddress);
+      expect(userEaseBalAfter.sub(userEaseBalBefore)).to.equal(
+        easeTokensToMint
+      );
+    });
     it("should fail if non armor token holder tries to swap for ease token", async function () {
       const amount = parseEther("1000");
       await contracts.armor

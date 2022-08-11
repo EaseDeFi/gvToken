@@ -10,6 +10,7 @@ import "../interfaces/IERC20.sol";
 import "../interfaces/IGvToken.sol";
 import "../interfaces/IBribePot.sol";
 import "../interfaces/IRcaController.sol";
+import "../interfaces/ITokenSwap.sol";
 import "../library/MerkleProof.sol";
 import "./Delegable.sol";
 
@@ -70,6 +71,7 @@ contract GvToken is
     IBribePot public pot;
     IERC20Permit public stakingToken;
     IRcaController public rcaController;
+    ITokenSwap public tokenSwap;
     /// @notice Timestamp rounded in weeks for earliest vArmor staker
     uint32 public genesis;
     /// @notice ease governance
@@ -129,18 +131,21 @@ contract GvToken is
     /// of Growing vote token.
     /// @param _rcaController Address of a RCA controller needed for verifying
     /// active rca vaults.
+    /// @param _tokenSwap VArmor to EASE token swap address
     /// @param _gov Governance Addresss.
     /// @param _genesis Deposit time of first vArmor holder.
     function initialize(
         address _pot,
         address _stakingToken,
         address _rcaController,
+        address _tokenSwap,
         address _gov,
         uint256 _genesis
     ) external initializer {
         pot = IBribePot(_pot);
         stakingToken = IERC20Permit(_stakingToken);
         rcaController = IRcaController(_rcaController);
+        tokenSwap = ITokenSwap(_tokenSwap);
         gov = _gov;
         genesis = uint32((_genesis / WEEK) * WEEK);
     }
@@ -163,13 +168,26 @@ contract GvToken is
         bytes32[] memory proof,
         PermitArgs memory permit
     ) external {
+        _depositForVArmorHolders(
+            msg.sender,
+            amount,
+            depositStart,
+            proof,
+            permit
+        );
+    }
+
+    function depositWithVArmor(
+        uint256 amount,
+        uint256 vArmorAmt,
+        uint256 depositStart,
+        bytes32[] memory proof,
+        PermitArgs memory permit
+    ) external {
         address user = msg.sender;
-        bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
+        tokenSwap.swapVArmorFor(user, vArmorAmt);
 
-        require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
-        require(depositStart >= genesis, "depositStart > genesis");
-
-        _deposit(user, amount, depositStart, permit, false);
+        _depositForVArmorHolders(user, amount, depositStart, proof, permit);
     }
 
     /// @notice Request redemption of gvToken back to ease
@@ -423,6 +441,13 @@ contract GvToken is
         return (gvBalance - (totalStaked + bribed));
     }
 
+    /// @notice Get total ease deposited by user
+    /// @param user The address of the account to get total deposit
+    /// @return total ease deposited by the user
+    function totalDeposit(address user) external view returns (uint256) {
+        return _totalDeposit[user];
+    }
+
     /// @notice Get deposits of a user
     /// @param user The address of the account to get the deposits of
     /// @return Details of deposits in an array
@@ -481,6 +506,21 @@ contract GvToken is
         }
 
         emit Deposited(user, amount);
+    }
+
+    function _depositForVArmorHolders(
+        address user,
+        uint256 amount,
+        uint256 depositStart,
+        bytes32[] memory proof,
+        PermitArgs memory permit
+    ) internal {
+        bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
+
+        require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
+        require(depositStart >= genesis, "depositStart < genesis");
+
+        _deposit(user, amount, depositStart, permit, false);
     }
 
     function _updateBalances(

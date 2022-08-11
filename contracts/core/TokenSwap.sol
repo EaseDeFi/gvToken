@@ -13,13 +13,13 @@ contract TokenSwap {
     IVArmor public immutable vArmor;
 
     constructor(
-        address _ease,
-        address _armor,
-        address _vArmor
+        address ease_,
+        address armor_,
+        address vArmor_
     ) {
-        ease = IEaseToken(_ease);
-        armor = IERC20(_armor);
-        vArmor = IVArmor(_vArmor);
+        ease = IEaseToken(ease_);
+        armor = IERC20(armor_);
+        vArmor = IVArmor(vArmor_);
     }
 
     function swap(uint256 amount) external {
@@ -28,9 +28,16 @@ contract TokenSwap {
     }
 
     function swapVArmor(uint256 amount) external {
-        // TODO: can we fix conversion rate at certain period in time to make this cheaper?
+        _swapVArmor(msg.sender, amount);
+    }
+
+    function _swapVArmor(address user, uint256 amount) internal {
         uint256 armorAmount = vArmor.vArmorToArmor(amount);
-        ease.transfer(msg.sender, armorAmount);
-        vArmor.transferFrom(msg.sender, DEAD, amount);
+        ease.transfer(user, armorAmount);
+        vArmor.transferFrom(user, DEAD, amount);
+    }
+
+    function swapVArmorFor(address user, uint256 amount) external {
+        _swapVArmor(user, amount);
     }
 }
