@@ -12,6 +12,7 @@ export type Contracts = {
 };
 export type Signers = {
   easeDeployer: SignerWithAddress;
+  vArmorHolder: SignerWithAddress;
   user: SignerWithAddress;
   alice: SignerWithAddress;
   bob: SignerWithAddress;
