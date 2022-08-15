@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity 0.8.11;
 
-import "../interfaces/IEaseGovernor.sol";
+import "./GovernorBravoInterfaces.sol";
 
 // solhint-disable not-rely-on-time
 // solhint-disable reason-string
@@ -16,7 +16,6 @@ contract GovernorBravoDelegate is
     string public constant name = "Ease Governor Bravo";
 
     // TODO: change constants to meet gvEase requirements
-
     /// @notice The minimum setable proposal threshold
     uint256 public constant MIN_PROPOSAL_THRESHOLD = 1000e18; // 1,000 gvEase
 
