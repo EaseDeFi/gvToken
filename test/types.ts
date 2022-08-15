@@ -6,9 +6,12 @@ import {
   IERC20,
   IVArmor,
   GvToken,
+  GovernorBravoDelegate,
+  Timelock,
+  BribePot,
   GvTokenV2,
 } from "../src/types";
-import { BribePot } from "../src/types/contracts/core/BribePot";
+
 export type Contracts = {
   ease: EaseToken;
   armor: IERC20;
@@ -17,7 +20,10 @@ export type Contracts = {
   gvToken: GvToken;
   bribePot: BribePot;
   gvTokenV2: GvTokenV2;
+  easeGovernance: GovernorBravoDelegate;
+  timelock: Timelock;
 };
+
 export type Signers = {
   easeDeployer: SignerWithAddress;
   vArmorHolder: SignerWithAddress;
