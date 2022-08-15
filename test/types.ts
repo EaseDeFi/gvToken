@@ -28,6 +28,7 @@ export type Signers = {
   easeDeployer: SignerWithAddress;
   vArmorHolder: SignerWithAddress;
   user: SignerWithAddress;
+  deployer: SignerWithAddress;
   alice: SignerWithAddress;
   bob: SignerWithAddress;
   gov: SignerWithAddress;

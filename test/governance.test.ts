@@ -28,17 +28,24 @@ const PROPOSAL_THRESOLD = parseEther("1000");
 describe("EaseGovernance", function () {
   const contracts = {} as Contracts;
   const signers = {} as Signers;
+  let userAddress: string;
+  let bobAddress: string;
+  let aliceAddress: string;
   let implAddress: string;
   before(async function () {
     const accounts = await ethers.getSigners();
-    signers.user = accounts[0];
-    signers.gov = accounts[1];
+    signers.deployer = accounts[0];
+    signers.user = accounts[1];
     signers.guardian = accounts[2];
     signers.alice = accounts[3];
     signers.bob = accounts[4];
     signers.briber = accounts[5];
     signers.easeDeployer = accounts[6];
     signers.otherAccounts = accounts.slice(7);
+    // initialize addresses
+    userAddress = signers.user.address;
+    bobAddress = signers.bob.address;
+    aliceAddress = signers.alice.address;
   });
   beforeEach(async function () {
     const EaseTokenFactory = <EaseToken__factory>(
@@ -60,41 +67,55 @@ describe("EaseGovernance", function () {
     const GovernorBravoDelegatorFactory = <GovernorBravoDelegator__factory>(
       await ethers.getContractFactory("GovernorBravoDelegator")
     );
-    const userNonce = await signers.user.getTransactionCount();
+    const deployerNonce = await signers.deployer.getTransactionCount();
     const gvTokenAddress = getContractAddress({
-      from: signers.user.address,
-      nonce: userNonce,
+      from: signers.deployer.address,
+      nonce: deployerNonce,
     });
     const bribePotAddress = getContractAddress({
-      from: signers.user.address,
-      nonce: userNonce + 1,
+      from: signers.deployer.address,
+      nonce: deployerNonce + 1,
     });
+
+    const govAddress = getContractAddress({
+      from: signers.deployer.address,
+      nonce: deployerNonce + 4,
+    });
+
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
     contracts.ease = await EaseTokenFactory.connect(
       signers.easeDeployer
     ).deploy();
     const easeAddress = contracts.ease.address;
-
-    contracts.gvToken = await GvTokenFactory.deploy(
+    // 1st transaction
+    contracts.gvToken = await GvTokenFactory.connect(signers.deployer).deploy(
       bribePotAddress,
       easeAddress,
       RCA_CONTROLLER,
-      signers.gov.address,
+      govAddress,
       GENESIS
     );
 
-    contracts.bribePot = await BribePotFactory.deploy(
+    // 2nd transaction
+    contracts.bribePot = await BribePotFactory.connect(signers.deployer).deploy(
       gvTokenAddress,
       easeAddress,
       RCA_CONTROLLER
     );
-    contracts.timelock = await TimelockFactory.deploy(
+    // 3rd transaction
+    contracts.timelock = await TimelockFactory.connect(signers.deployer).deploy(
       signers.guardian.address,
       TIME_IN_SECS.day * 2
     );
-    const bravoDelegate = await GovernorBravoDelegateFactory.deploy();
+    // 4th transaction
+    const bravoDelegate = await GovernorBravoDelegateFactory.connect(
+      signers.deployer
+    ).deploy();
     implAddress = bravoDelegate.address;
-    const bravoDelegator = await GovernorBravoDelegatorFactory.deploy(
+    // 5th transaction
+    const bravoDelegator = await GovernorBravoDelegatorFactory.connect(
+      signers.deployer
+    ).deploy(
       contracts.timelock.address,
       contracts.gvToken.address,
       signers.guardian.address,
@@ -103,10 +124,16 @@ describe("EaseGovernance", function () {
       VOTING_DELAY,
       PROPOSAL_THRESOLD
     );
+
     contracts.easeGovernance = await ethers.getContractAt(
       "GovernorBravoDelegate",
       bravoDelegator.address
     );
+
+    // transfer EASE token to wallets
+    await contracts.ease.transfer(userAddress, parseEther("100000"));
+    await contracts.ease.transfer(aliceAddress, parseEther("100000"));
+    await contracts.ease.transfer(bobAddress, parseEther("100000"));
   });
 
   async function depositFor(user: SignerWithAddress, value: BigNumber) {
@@ -156,6 +183,7 @@ describe("EaseGovernance", function () {
         s,
       });
   }
+  // TESTS
   describe("#initialState", function () {
     it("should initialize contract properly", async function () {
       expect(await contracts.easeGovernance.admin()).to.equal(
@@ -189,6 +217,60 @@ describe("EaseGovernance", function () {
       expect(await contracts.easeGovernance.proposalThreshold()).to.equal(
         PROPOSAL_THRESOLD
       );
+    });
+  });
+  describe.only("propose()", function () {
+    // PROPOSAL ARGS
+
+    let targets: string[];
+    let values: BigNumber[];
+    let signatures: string[];
+    let calldatas: string[];
+    let description: string;
+    this.beforeEach(async function () {
+      targets = [contracts.gvToken.address];
+      values = [parseEther("0")];
+      signatures = [""];
+      calldatas = [
+        contracts.gvToken.interface.encodeFunctionData("setPower", [
+          randomBytes(32),
+        ]),
+      ];
+      description = "Merkle root for vArmor holders";
+      // deposit to gvEase for the user
+      const userDepositVal = parseEther("20000");
+      await depositFor(signers.user, userDepositVal);
+      await contracts.gvToken.connect(signers.user).delegate(userAddress);
+
+      // deposit for alice
+      const aliceDepositVal = parseEther("100");
+      await depositFor(signers.alice, aliceDepositVal);
+      await contracts.gvToken.connect(signers.alice).delegate(aliceAddress);
+    });
+    it("should fail if user submitting proposal doesnt have enough gvPower", async function () {
+      // bob doesn't have any gvPower
+      await expect(
+        contracts.easeGovernance
+          .connect(signers.bob)
+          .propose(targets, values, signatures, calldatas, description)
+      ).to.revertedWith(
+        "GovernorBravo::propose: proposer votes below proposal threshold"
+      );
+      // alice has only about 100 gvEASE
+      await expect(
+        contracts.easeGovernance
+          .connect(signers.alice)
+          .propose(targets, values, signatures, calldatas, description)
+      ).to.revertedWith(
+        "GovernorBravo::propose: proposer votes below proposal threshold"
+      );
+    });
+    it("should allow user to submit a proposal", async function () {
+      // do something anon
+
+      await contracts.easeGovernance
+        .connect(signers.user)
+        .propose(targets, values, signatures, calldatas, description);
     });
   });
 });

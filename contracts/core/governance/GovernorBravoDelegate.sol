@@ -118,11 +118,6 @@ contract GovernorBravoDelegate is
         bytes[] memory calldatas,
         string memory description
     ) public returns (uint256) {
-        // Reject proposals before initiating as Governor
-        require(
-            initialProposalId != 0,
-            "GovernorBravo::propose: Governor Bravo not active"
-        );
         // Allow addresses above proposal threshold and whitelisted addresses to propose
         require(
             gvEase.getPriorVotes(msg.sender, sub256(block.number, 1)) >
