@@ -40,6 +40,24 @@ export async function getTimestamp(): Promise<BigNumber> {
   return BigNumber.from(res.timestamp);
 }
 
+export async function getBlockNumber(): Promise<BigNumber> {
+  const signers = await ethers.getSigners();
+  const signer = signers[0];
+  const res = await (signer.provider as providers.JsonRpcProvider).send(
+    "eth_getBlockByNumber",
+    ["latest", false]
+  );
+  return BigNumber.from(res.number);
+}
+
+export async function mineNBlocks(n: number) {
+  const signers = await ethers.getSigners();
+  const signer = signers[0];
+  await (signer.provider as providers.JsonRpcProvider).send("hardhat_mine", [
+    ethers.utils.hexlify(n),
+  ]);
+}
+
 export async function mine() {
   const signers = await ethers.getSigners();
   const signer = signers[0];
