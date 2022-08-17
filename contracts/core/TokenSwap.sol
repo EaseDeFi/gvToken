@@ -23,21 +23,29 @@ contract TokenSwap {
     }
 
     function swap(uint256 amount) external {
-        ease.transfer(msg.sender, amount);
-        armor.transferFrom(msg.sender, DEAD, amount);
+        _swap(msg.sender, amount);
+    }
+
+    function swapFor(address user, uint256 amount) external {
+        _swap(user, amount);
     }
 
     function swapVArmor(uint256 amount) external {
         _swapVArmor(msg.sender, amount);
     }
 
+    function swapVArmorFor(address user, uint256 amount) external {
+        _swapVArmor(user, amount);
+    }
+
+    function _swap(address user, uint256 amount) internal {
+        ease.transfer(user, amount);
+        armor.transferFrom(user, DEAD, amount);
+    }
+
     function _swapVArmor(address user, uint256 amount) internal {
         uint256 armorAmount = vArmor.vArmorToArmor(amount);
         ease.transfer(user, armorAmount);
         vArmor.transferFrom(user, DEAD, amount);
-    }
-
-    function swapVArmorFor(address user, uint256 amount) external {
-        _swapVArmor(user, amount);
     }
 }

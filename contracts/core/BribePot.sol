@@ -271,7 +271,7 @@ contract BribePot {
         return block.timestamp < periodFinish ? block.timestamp : periodFinish;
     }
 
-    function rewardPerToken() public view returns (uint256) {
+    function rewardPerToken() external view returns (uint256) {
         if (_totalSupply == 0) {
             return rewardPerTokenStored;
         }

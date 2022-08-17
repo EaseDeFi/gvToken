@@ -79,7 +79,7 @@ contract GvToken is
     /// @notice total amount of EASE deposited
     uint256 public totalDeposited;
     /// @notice Time delay for withdrawals which will be set by governance
-    uint256 public withdrawalDelay = 14 days;
+    uint256 public withdrawalDelay = 7 days;
 
     /// @notice total supply of gvToken
     uint256 private _totalSupply;
@@ -151,6 +151,9 @@ contract GvToken is
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
+    /// @notice Deposit ease and recieve gvEASE
+    /// @param amount Amount of ease to deposit.
+    /// @param permit v,r,s and deadline for signed approvals (EIP-2612)
     function deposit(uint256 amount, PermitArgs memory permit) external {
         _deposit(msg.sender, amount, block.timestamp, permit, false);
     }
@@ -177,6 +180,13 @@ contract GvToken is
         );
     }
 
+    /// @notice Deposit vArmor and recieve gvEASE with extra start time
+    /// @param amount Amount of EASE
+    /// @param vArmorAmt Amount in vArmor
+    /// @param depositStart Extra time start for stakers of Armor Token
+    /// as promised by EASE DAO when token migration from ARMOR to EASE
+    /// @param proof Merkle proof of the vArmor staker
+    /// @param permit v,r,s and deadline for signed approvals (EIP-2612)
     function depositWithVArmor(
         uint256 amount,
         uint256 vArmorAmt,
@@ -188,6 +198,17 @@ contract GvToken is
         tokenSwap.swapVArmorFor(user, vArmorAmt);
 
         _depositForVArmorHolders(user, amount, depositStart, proof, permit);
+    }
+
+    /// @notice Deposit armor and recieve gvEASE
+    /// @param amount Amount of armor to deposit.
+    /// @param permit v,r,s and deadline for signed approvals (EIP-2612)
+    function depositWithArmor(uint256 amount, PermitArgs memory permit)
+        external
+    {
+        address user = msg.sender;
+        tokenSwap.swapFor(user, amount);
+        _deposit(user, amount, block.timestamp, permit, false);
     }
 
     /// @notice Request redemption of gvToken back to ease
@@ -373,7 +394,7 @@ contract GvToken is
     /// @param time Delay time in seconds
     function setDelay(uint256 time) external onlyGov {
         time = (time / 1 weeks) * 1 weeks;
-        require(time > 2 weeks, "min delay 14 days");
+        require(time > 1 weeks, "min delay 7 days");
         withdrawalDelay = time;
     }
 

@@ -1303,4 +1303,17 @@ describe("GvToken", function () {
       ).to.revertedWith("existing > new amount");
     });
   });
+  describe("setDelay()", function () {
+    xit("should set withdrawal delay", async function () {
+      // TODO: complete this
+    });
+    xit("should not set withdrawal delay less than 7 days", async function () {
+      //
+    });
+  });
+  describe("setRoot()", function () {
+    xit("should allow governance to set root()", async function () {
+      //
+    });
+  });
 });
