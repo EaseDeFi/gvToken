@@ -17,3 +17,16 @@ export function getMainnetUrl(): string {
 export function isMainnetFork(): boolean {
   return !!process.env.FORKING;
 }
+
+export function getAlchemyApiKey(): string {
+  if (process.env.ALCHEMY_API_KEY === undefined) {
+    throw new Error("Please set tenderly api key in your .env");
+  }
+  return process.env.ALCHEMY_API_KEY as string;
+}
+export function getProviderRpc(): string {
+  if (process.env.PROVIDER_RPC === undefined) {
+    throw new Error("Please set PROVIDER_RPC in your .env");
+  }
+  return process.env.PROVIDER_RPC as string;
+}
