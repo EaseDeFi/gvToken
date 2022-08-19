@@ -111,6 +111,42 @@ describe("TokenSwap", function () {
       const userEaseBalAfter = await contracts.ease.balanceOf(userAddress);
       expect(userEaseBalAfter.sub(userEaseBalBefore)).to.be.equal(amount);
     });
+    it("should fail if non armor token holder tries to swap for ease token", async function () {
+      const amount = parseEther("1000");
+      await contracts.armor
+        .connect(signers.gov)
+        .approve(contracts.tokenSwap.address, amount);
+      await expect(
+        contracts.tokenSwap.connect(signers.gov).swap(amount)
+      ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    });
+  });
+  describe("swapFor()", function () {
+    it("should allow other users to swap Armor for EASE on holders behalf", async function () {
+      const userAddress = signers.user.address;
+      const amount = parseEther("1000");
+      await contracts.armor
+        .connect(signers.user)
+        .approve(contracts.tokenSwap.address, amount);
+
+      const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
+      await contracts.tokenSwap
+        .connect(signers.otherAccounts[0])
+        .swapFor(userAddress, amount);
+      const userEaseBalAfter = await contracts.ease.balanceOf(userAddress);
+      expect(userEaseBalAfter.sub(userEaseBalBefore)).to.be.equal(amount);
+    });
+    it("should fail if Armor holder hasn't approved the swap contract", async function () {
+      const userAddress = signers.user.address;
+      const amount = parseEther("1000");
+      await expect(
+        contracts.tokenSwap
+          .connect(signers.otherAccounts[0])
+          .swapFor(userAddress, amount)
+      ).to.revertedWith("ERC20: transfer amount exceeds allowance");
+    });
+  });
+  describe("swapVArmor()", function () {
     it("should allow user to swap vArmor tokens for ease tokens", async function () {
       const userAddress = signers.user.address;
       const amount = parseEther("1000");
@@ -125,7 +161,18 @@ describe("TokenSwap", function () {
         easeTokensToMint
       );
     });
-    it("should allow other users to swap on vArmor for EASE on holders behalf", async function () {
+    it("should fail if non vArmor holder tries to swap for ease token", async function () {
+      const amount = parseEther("1000");
+      await contracts.armor
+        .connect(signers.gov)
+        .approve(contracts.tokenSwap.address, amount);
+      await expect(
+        contracts.tokenSwap.connect(signers.gov).swapVArmor(amount)
+      ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    });
+  });
+  describe("swapVArmorFor()", function () {
+    it("should allow other users to swap vArmor for EASE on holders behalf", async function () {
       const userAddress = signers.user.address;
       const amount = parseEther("1000");
       await contracts.vArmor
@@ -144,14 +191,14 @@ describe("TokenSwap", function () {
         easeTokensToMint
       );
     });
-    it("should fail if non armor token holder tries to swap for ease token", async function () {
+    it("should fail if vArmor holder hasn't approved the swap contract", async function () {
+      const userAddress = signers.user.address;
       const amount = parseEther("1000");
-      await contracts.armor
-        .connect(signers.gov)
-        .approve(contracts.tokenSwap.address, amount);
       await expect(
-        contracts.tokenSwap.connect(signers.gov).swap(amount)
-      ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+        contracts.tokenSwap
+          .connect(signers.otherAccounts[0])
+          .swapVArmorFor(userAddress, amount)
+      ).to.revertedWith("ERC20: transfer amount exceeds allowance");
     });
   });
 });
