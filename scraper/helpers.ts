@@ -81,13 +81,14 @@ export async function getTransferEvents(
 }
 
 export async function getNormalizedStartTime(
-  recieveEvents: TransferEvent[]
+  recieveEvents: TransferEvent[],
+  startAddress = ethers.constants.AddressZero
 ): Promise<BigNumber> {
   const provider = await getProvider();
   let numerator: BigNumber = BigNumber.from(0);
   let denominator: BigNumber = BigNumber.from(0);
   for (const event of recieveEvents) {
-    const [from, amount] = event.args;
+    const [from, to, amount] = event.args;
 
     const block = await provider.getBlock(event.blockNumber);
     const timestamp = BigNumber.from(block.timestamp);
@@ -100,22 +101,25 @@ export async function getNormalizedStartTime(
       // and use it as timestamp for the wallet recieving vArmror
       // if we are inside this conditional we need to get
       // the normalized start time of vArmor sender at
-      // this time and multiply it with transferAmount
-      // TODO: FIX THIS as it enter's infinite loop if there's back and
-      // forth transfers to the same address
-      // const { recieveEvents } = await getTransferEvents(from);
-      // const normalizedTimeOfSender = await getNormalizedStartTime(
-      //   recieveEvents
-      // );
-      // numerator = numerator.add(normalizedTimeOfSender.mul(amount));
-      // denominator = denominator.add(amount);
+      // this block and multiply it with transferAmount
+
+      // this condidtional avoids us from getting into
+      // infinite loop if there's back and forth transaction
+      // between two wallets
+      if (startAddress !== to) {
+        const _startAddress =
+          startAddress === ethers.constants.AddressZero ? to : startAddress;
+        const { recieveEvents } = await getTransferEvents(from);
+        const normalizedTimeOfSender = await getNormalizedStartTime(
+          recieveEvents,
+          _startAddress
+        );
+        numerator = numerator.add(normalizedTimeOfSender.mul(amount));
+        denominator = denominator.add(amount);
+      }
     }
   }
 
-  if (numerator.isZero()) {
-    console.log(`There's an error with normalize time for this account`);
-    return numerator;
-  }
   return numerator.div(denominator);
 }
 

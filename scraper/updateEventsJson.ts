@@ -12,7 +12,7 @@ import { getTransferEvents, getVarmorHolders } from "./helpers";
   const holdersEventDetails: AccountEventDetail[] = [];
   let holderEventDetail: AccountEventDetail;
   for (const holder of holders) {
-    console.log(`Fetching events of ${holder.account}`);
+    console.log(`Fetching events for ${holder.account}`);
     const { sendEvents, recieveEvents } = await getTransferEvents(
       holder.account
     );
