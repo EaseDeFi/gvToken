@@ -1365,16 +1365,39 @@ describe("GvToken", function () {
     });
   });
   describe("setDelay()", function () {
-    xit("should set withdrawal delay", async function () {
-      // TODO: complete this
+    it("should set withdrawal delay", async function () {
+      const newDelay = TIME_IN_SECS.week * 3;
+      await contracts.gvToken.connect(signers.gov).setDelay(newDelay);
+      const updatedDelay = await contracts.gvToken.withdrawalDelay();
+      expect(updatedDelay).to.equal(newDelay);
     });
-    xit("should not set withdrawal delay less than 7 days", async function () {
-      //
+    it("should not set withdrawal delay less than 7 days", async function () {
+      const newDelay = TIME_IN_SECS.day * 3;
+      await expect(
+        contracts.gvToken.connect(signers.gov).setDelay(newDelay)
+      ).to.revertedWith("min delay 7 days");
     });
   });
-  describe("setRoot()", function () {
-    xit("should allow governance to set power root", async function () {
+  describe("setPower()", function () {
+    it("should allow governance to set power root", async function () {
       //
+      const bobValue = parseEther("100");
+      const aliceValue = parseEther("100");
+      const depositStart = await getTimestamp();
+      const powerTree = new BalanceTree([
+        {
+          account: bobAddress,
+          amount: bobValue,
+          depositStart,
+        },
+        {
+          account: aliceAddress,
+          amount: aliceValue,
+          depositStart,
+        },
+      ]);
+      const root = powerTree.getHexRoot();
+      await contracts.gvToken.connect(signers.gov).setPower(root);
     });
   });
 });
