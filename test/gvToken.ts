@@ -957,7 +957,7 @@ describe("GvToken", function () {
       // check for emit
       const amount = parseEther("10");
       // 14 days delay
-      const endTime = (await getTimestamp()).add(TIME_IN_SECS.week * 2).add(1);
+      const endTime = (await getTimestamp()).add(TIME_IN_SECS.week * 1).add(1);
       await expect(
         contracts.gvToken.connect(signers.user).withdrawRequest(amount)
       )
@@ -974,7 +974,7 @@ describe("GvToken", function () {
         userAddress
       );
       // delay until
-      const firstEndTime = (await getTimestamp()).add(TIME_IN_SECS.week * 2);
+      const firstEndTime = (await getTimestamp()).add(TIME_IN_SECS.week * 1);
       expect(withdrawRequest.amount).to.equal(firstWithdrawAmt);
       expect(withdrawRequest.endTime).to.equal(firstEndTime);
       // move forward
@@ -983,7 +983,7 @@ describe("GvToken", function () {
 
       // 2nd withdraw request
       const secondWithdrawAmt = parseEther("10");
-      const secondEndTime = (await getTimestamp()).add(TIME_IN_SECS.week * 2);
+      const secondEndTime = (await getTimestamp()).add(TIME_IN_SECS.week * 1);
 
       await contracts.gvToken
         .connect(signers.user)
