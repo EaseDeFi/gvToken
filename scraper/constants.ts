@@ -1,5 +1,9 @@
+import { BigNumber } from "ethers";
+
 // block number before vArm
 export const vArmorCreationBlockNumber = 13511162;
+// Thu Apr 14 2022 00:00:00 GMT+0000
+export const vArmorBonusStart = BigNumber.from(1649894400);
 
 // Addresses that has transferred vArmor to other wallets
 export const TransferringAddresses = [

@@ -10,7 +10,7 @@ import { MAINNET_ADDRESSES } from "../test/constants";
 import erc20Artifact from "../artifacts/contracts/interfaces/IERC20.sol/IERC20Permit.json";
 import { EaseToken } from "../src/types";
 import { TransferEvent } from "../src/types/contracts/core/EaseToken";
-import { vArmorCreationBlockNumber } from "./constants";
+import { vArmorBonusStart, vArmorCreationBlockNumber } from "./constants";
 
 dayjs.extend(relativeTime);
 
@@ -159,9 +159,15 @@ export async function getFormattedBalanceNodes(): Promise<BalanceNode[]> {
     const normalizedStartTime = await getNormalizedStartTime(
       holderDetail.recieveEvents
     );
+
+    // check if normalized time is before april 14th 2022
+    // if true use april 14th instead
+    const depositStart = normalizedStartTime.gt(vArmorBonusStart)
+      ? vArmorBonusStart
+      : normalizedStartTime;
     const userBalance: BalanceNode = {
       account: holderDetail.account,
-      depositStart: normalizedStartTime,
+      depositStart,
       amount: balance,
     };
     balances.push(userBalance);
