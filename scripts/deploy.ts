@@ -1,6 +1,7 @@
 import "@nomiclabs/hardhat-ethers";
+import "@openzeppelin/hardhat-upgrades";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
-import hre, { ethers } from "hardhat";
+import hre, { ethers, upgrades } from "hardhat";
 
 import {
   EaseToken,
@@ -64,14 +65,17 @@ async function main() {
     nonce: nonce + 1,
   });
   // third contract to deploy nonce+=2
-  const gvTokenAddress = getContractAddress({
+  const bribePotAddress = getContractAddress({
     from: signers.user.address,
     nonce: nonce + 2,
   });
-  // fourth contract to deploy nonce+=3
-  const bribePotAddress = getContractAddress({
+  // we will deploy gvToken using deploy proxy
+  // which will deploy implementation first and proxy later
+  // meaning nonce+4 will nonce while deploying uups proxy
+  // fourth contract to deploy nonce+=4
+  const gvTokenAddress = getContractAddress({
     from: signers.user.address,
-    nonce: nonce + 3,
+    nonce: nonce + 4,
   });
 
   // deploy tokenswap contract
@@ -95,14 +99,6 @@ async function main() {
   console.log({ easeTokenAddress });
 
   const GENESIS = await getTimestamp();
-  // Deploy gvToken
-  contracts.gvToken = <GvToken>(
-    await GvTokenFactory.connect(signers.user).deploy()
-  );
-  await contracts.gvToken.deployed();
-  console.log(`Gv Token deployed at ${contracts.gvToken.address}`);
-  console.log({ gvTokenAddress });
-
   // deploy bribePot
   contracts.bribePot = <BribePot>(
     await BribePotFactory.connect(signers.user).deploy(
@@ -114,15 +110,24 @@ async function main() {
   await contracts.bribePot.deployed();
   console.log(`Bribe Pot deployed at ${contracts.bribePot.address}`);
   console.log({ bribePotAddress });
+
+  // Deploy gvToken
+  contracts.gvToken = <GvToken>(
+    await upgrades.deployProxy(GvTokenFactory, [
+      bribePotAddress,
+      easeTokenAddress,
+      RCA_CONTROLLER,
+      tokenSwapAddress,
+      signers.user.address,
+      GENESIS,
+    ])
+  );
+  await contracts.gvToken.deployed();
+  console.log(`Gv Token deployed at ${contracts.gvToken.address}`);
+  console.log({ gvTokenAddress });
+
   // Fund tokenswap with ease token
   await contracts.ease.transfer(tokenSwapAddress, parseEther("1000000"));
-  await contracts.gvToken.initialize(
-    bribePotAddress,
-    easeTokenAddress,
-    RCA_CONTROLLER,
-    signers.user.address,
-    GENESIS
-  );
   async function depositStakeBribe() {
     // swap armor for ease
     // approve armor
