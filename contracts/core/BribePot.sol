@@ -8,7 +8,7 @@ import "../interfaces/IRcaController.sol";
 // solhint-disable not-rely-on-time
 
 contract BribePot {
-        using SafeERC20Upgradeable for IERC20Permit;
+    using SafeERC20Upgradeable for IERC20Permit;
 
     /* ========== structs ========== */
     struct BribeDetail {
