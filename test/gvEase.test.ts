@@ -2,10 +2,11 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { getContractAddress, parseEther, randomBytes } from "ethers/lib/utils";
-import hre, { ethers } from "hardhat";
+import hre, { ethers, upgrades } from "hardhat";
 import {
   BribePot__factory,
   EaseToken__factory,
+  GvToken,
   GvToken__factory,
   IERC20,
   IVArmor,
@@ -59,13 +60,18 @@ describe("GvToken", function () {
     );
 
     const userNonce = await signers.user.getTransactionCount();
-    const gvTokenAddress = getContractAddress({
+    const bribePotAddress = getContractAddress({
       from: signers.user.address,
       nonce: userNonce,
     });
-    const bribePotAddress = getContractAddress({
+    const gvTokenAddress = getContractAddress({
       from: signers.user.address,
       nonce: userNonce + 1,
+    });
+
+    const tokenSwapAddress = getContractAddress({
+      from: signers.user.address,
+      nonce: userNonce + 2,
     });
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
     contracts.ease = await EaseTokenFactory.connect(
@@ -73,27 +79,29 @@ describe("GvToken", function () {
     ).deploy();
     const easeAddress = contracts.ease.address;
 
-    contracts.gvToken = await GvTokenFactory.deploy();
     contracts.bribePot = await BribePotFactory.deploy(
       gvTokenAddress,
       easeAddress,
       RCA_CONTROLLER
     );
+
+    contracts.gvToken = <GvToken>(
+      await upgrades.deployProxy(GvTokenFactory, [
+        bribePotAddress,
+        easeAddress,
+        RCA_CONTROLLER,
+        tokenSwapAddress,
+        signers.gov.address,
+        GENESIS,
+      ])
+    );
+
     contracts.tokenSwap = <TokenSwap>(
       await TOKEN_SWAP_FACTORY.connect(signers.user).deploy(
         contracts.ease.address,
         MAINNET_ADDRESSES.armor,
         MAINNET_ADDRESSES.vArmor
       )
-    );
-    // Initialize gvToken
-    await contracts.gvToken.initialize(
-      bribePotAddress,
-      easeAddress,
-      RCA_CONTROLLER,
-      contracts.tokenSwap.address,
-      signers.gov.address,
-      GENESIS
     );
 
     await hre.network.provider.send("hardhat_impersonateAccount", [
