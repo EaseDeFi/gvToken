@@ -12,5 +12,5 @@ artifacts
 
 # local files
 ScratchPad.md
-DelegateBackup.sol
 try.ts
+.openzeppelin/

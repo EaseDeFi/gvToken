@@ -4,6 +4,7 @@ import "@nomiclabs/hardhat-etherscan";
 import "hardhat-abi-exporter";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
+import "@openzeppelin/hardhat-upgrades";
 import "solidity-coverage";
 
 import { resolve } from "path";

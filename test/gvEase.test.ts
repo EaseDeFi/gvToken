@@ -212,6 +212,9 @@ describe("GvToken", function () {
     it("should return correct decimals", async function () {
       expect(await contracts.gvToken.decimals()).to.equal(18);
     });
+    it("should set the deployer as the owner", async function () {
+      expect(await contracts.gvToken.owner()).to.equal(userAddress);
+    });
   });
   describe("restricted", function () {
     it("should not allow other address to call restricted functions", async function () {
@@ -1034,7 +1037,7 @@ describe("GvToken", function () {
         contracts.gvToken.connect(signers.user).withdrawFinalize()
       ).to.revertedWith("withdrawal not yet allowed");
     });
-    it("should allow user to finalize withdarw after delay", async function () {
+    it("should allow user to finalize withdraw after delay", async function () {
       const withdrawAmount = parseEther("10");
       await contracts.gvToken
         .connect(signers.user)
