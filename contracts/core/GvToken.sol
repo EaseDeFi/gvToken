@@ -2,11 +2,15 @@
 pragma solidity 0.8.11;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "../interfaces/IERC20.sol";
 import "../interfaces/IGvToken.sol";
 import "../interfaces/IBribePot.sol";
 import "../interfaces/IRcaController.sol";
+import "../interfaces/ITokenSwap.sol";
 import "../library/MerkleProof.sol";
 import "./Delegable.sol";
 
@@ -14,8 +18,14 @@ import "./Delegable.sol";
 // solhint-disable reason-string
 // solhint-disable max-states-count
 // solhint-disable no-inline-assembly
+// solhint-disable no-empty-blocks
 
-contract GvToken is Delegable {
+contract GvToken is
+    Delegable,
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable
+{
     using SafeERC20 for IERC20Permit;
 
     /* ========== STRUCTS ========== */
@@ -58,17 +68,18 @@ contract GvToken is Delegable {
     uint256 internal constant MULTIPLIER = 1e18;
 
     /* ========== STATE ========== */
-    IBribePot public immutable pot;
-    IERC20Permit public immutable stakingToken;
-    IRcaController public immutable rcaController;
+    IBribePot public pot;
+    IERC20Permit public stakingToken;
+    IRcaController public rcaController;
+    ITokenSwap public tokenSwap;
     /// @notice Timestamp rounded in weeks for earliest vArmor staker
-    uint32 public immutable genesis;
+    uint32 public genesis;
     /// @notice ease governance
     address public gov;
     /// @notice total amount of EASE deposited
     uint256 public totalDeposited;
     /// @notice Time delay for withdrawals which will be set by governance
-    uint256 public withdrawalDelay = 14 days;
+    uint256 public withdrawalDelay = 7 days;
 
     /// @notice total supply of gvToken
     uint256 private _totalSupply;
@@ -113,30 +124,36 @@ contract GvToken is Delegable {
         _;
     }
 
-    /* ========== CONSTRUCTOR ========== */
-    /// @notice Construct a new gvToken.
+    /* ========== INITIALIZE ========== */
+    /// @notice Initialize a new gvToken.
     /// @param _pot Address of a bribe pot.
     /// @param _stakingToken Address of a token to be deposited in exchange
     /// of Growing vote token.
     /// @param _rcaController Address of a RCA controller needed for verifying
     /// active rca vaults.
+    /// @param _tokenSwap VArmor to EASE token swap address
     /// @param _gov Governance Addresss.
     /// @param _genesis Deposit time of first vArmor holder.
-    constructor(
+    function initialize(
         address _pot,
         address _stakingToken,
         address _rcaController,
+        address _tokenSwap,
         address _gov,
         uint256 _genesis
-    ) {
+    ) external initializer {
         pot = IBribePot(_pot);
         stakingToken = IERC20Permit(_stakingToken);
         rcaController = IRcaController(_rcaController);
+        tokenSwap = ITokenSwap(_tokenSwap);
         gov = _gov;
         genesis = uint32((_genesis / WEEK) * WEEK);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
+    /// @notice Deposit ease and recieve gvEASE
+    /// @param amount Amount of ease to deposit.
+    /// @param permit v,r,s and deadline for signed approvals (EIP-2612)
     function deposit(uint256 amount, PermitArgs memory permit) external {
         _deposit(msg.sender, amount, block.timestamp, permit, false);
     }
@@ -154,13 +171,44 @@ contract GvToken is Delegable {
         bytes32[] memory proof,
         PermitArgs memory permit
     ) external {
+        _depositForVArmorHolders(
+            msg.sender,
+            amount,
+            depositStart,
+            proof,
+            permit
+        );
+    }
+
+    /// @notice Deposit vArmor and recieve gvEASE with extra start time
+    /// @param amount Amount of EASE
+    /// @param vArmorAmt Amount in vArmor
+    /// @param depositStart Extra time start for stakers of Armor Token
+    /// as promised by EASE DAO when token migration from ARMOR to EASE
+    /// @param proof Merkle proof of the vArmor staker
+    /// @param permit v,r,s and deadline for signed approvals (EIP-2612)
+    function depositWithVArmor(
+        uint256 amount,
+        uint256 vArmorAmt,
+        uint256 depositStart,
+        bytes32[] memory proof,
+        PermitArgs memory permit
+    ) external {
         address user = msg.sender;
-        bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
+        tokenSwap.swapVArmorFor(user, vArmorAmt);
 
-        require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
-        require(depositStart >= genesis, "depositStart > genesis");
+        _depositForVArmorHolders(user, amount, depositStart, proof, permit);
+    }
 
-        _deposit(user, amount, depositStart, permit, false);
+    /// @notice Deposit armor and recieve gvEASE
+    /// @param amount Amount of armor to deposit.
+    /// @param permit v,r,s and deadline for signed approvals (EIP-2612)
+    function depositWithArmor(uint256 amount, PermitArgs memory permit)
+        external
+    {
+        address user = msg.sender;
+        tokenSwap.swapFor(user, amount);
+        _deposit(user, amount, block.timestamp, permit, false);
     }
 
     /// @notice Request redemption of gvToken back to ease
@@ -346,7 +394,7 @@ contract GvToken is Delegable {
     /// @param time Delay time in seconds
     function setDelay(uint256 time) external onlyGov {
         time = (time / 1 weeks) * 1 weeks;
-        require(time > 2 weeks, "min delay 14 days");
+        require(time > 1 weeks, "min delay 7 days");
         withdrawalDelay = time;
     }
 
@@ -414,6 +462,13 @@ contract GvToken is Delegable {
         return (gvBalance - (totalStaked + bribed));
     }
 
+    /// @notice Get total ease deposited by user
+    /// @param user The address of the account to get total deposit
+    /// @return total ease deposited by the user
+    function totalDeposit(address user) external view returns (uint256) {
+        return _totalDeposit[user];
+    }
+
     /// @notice Get deposits of a user
     /// @param user The address of the account to get the deposits of
     /// @return Details of deposits in an array
@@ -439,6 +494,8 @@ contract GvToken is Delegable {
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     ///@notice Deposit EASE to obtain gvToken that grows upto
     ///twice the amount of ease being deposited.
@@ -470,6 +527,21 @@ contract GvToken is Delegable {
         }
 
         emit Deposited(user, amount);
+    }
+
+    function _depositForVArmorHolders(
+        address user,
+        uint256 amount,
+        uint256 depositStart,
+        bytes32[] memory proof,
+        PermitArgs memory permit
+    ) internal {
+        bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
+
+        require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
+        require(depositStart >= genesis, "depositStart < genesis");
+
+        _deposit(user, amount, depositStart, permit, false);
     }
 
     function _updateBalances(

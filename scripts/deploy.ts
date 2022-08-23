@@ -97,13 +97,7 @@ async function main() {
   const GENESIS = await getTimestamp();
   // Deploy gvToken
   contracts.gvToken = <GvToken>(
-    await GvTokenFactory.connect(signers.user).deploy(
-      bribePotAddress,
-      easeTokenAddress,
-      RCA_CONTROLLER,
-      signers.user.address,
-      GENESIS
-    )
+    await GvTokenFactory.connect(signers.user).deploy()
   );
   await contracts.gvToken.deployed();
   console.log(`Gv Token deployed at ${contracts.gvToken.address}`);
@@ -122,6 +116,13 @@ async function main() {
   console.log({ bribePotAddress });
   // Fund tokenswap with ease token
   await contracts.ease.transfer(tokenSwapAddress, parseEther("1000000"));
+  await contracts.gvToken.initialize(
+    bribePotAddress,
+    easeTokenAddress,
+    RCA_CONTROLLER,
+    signers.user.address,
+    GENESIS
+  );
   async function depositStakeBribe() {
     // swap armor for ease
     // approve armor
