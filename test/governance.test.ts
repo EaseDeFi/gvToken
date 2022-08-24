@@ -3,10 +3,11 @@ import chai, { expect } from "chai";
 import { solidity } from "ethereum-waffle";
 import { BigNumber } from "ethers";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import {
   GovernorBravoDelegate__factory,
   GovernorBravoDelegator__factory,
+  GvToken,
   Timelock__factory,
 } from "../src/types";
 import {
@@ -90,6 +91,10 @@ describe("EaseGovernance", function () {
       from: signers.deployer.address,
       nonce: deployerNonce + 1,
     });
+    const timelockAddress = getContractAddress({
+      from: signers.deployer.address,
+      nonce: deployerNonce + 2,
+    });
 
     const govAddress = getContractAddress({
       from: signers.deployer.address,
@@ -101,13 +106,22 @@ describe("EaseGovernance", function () {
       signers.easeDeployer
     ).deploy();
     const easeAddress = contracts.ease.address;
+    // As we will not call depositWithVarmor or depositWithArmor
+    const tokenSwapAddress = easeAddress;
     // 1st transaction
-    contracts.gvToken = await GvTokenFactory.connect(signers.deployer).deploy(
-      bribePotAddress,
-      easeAddress,
-      RCA_CONTROLLER,
-      govAddress,
-      GENESIS
+    contracts.gvToken = <GvToken>(
+      await upgrades.deployProxy(
+        GvTokenFactory,
+        [
+          bribePotAddress,
+          easeAddress,
+          RCA_CONTROLLER,
+          tokenSwapAddress,
+          timelockAddress,
+          GENESIS,
+        ],
+        { kind: "uups" }
+      )
     );
 
     // 2nd transaction
@@ -360,6 +374,54 @@ describe("EaseGovernance", function () {
       // proposal execution
       expect(await contracts.timelock.pendingAdmin()).to.equal(
         signers.guardian.address
+      );
+    });
+    it("should update withdrawal delay of gvToken", async function () {
+      // update proposal args
+      targets = [contracts.gvToken.address];
+      calldatas = [
+        contracts.gvToken.interface.encodeFunctionData("setDelay", [
+          TIME_IN_SECS.month,
+        ]),
+      ];
+      description = "Set withdrawal delay to one month";
+
+      // Submit a proposal
+      await contracts.easeGovernance
+        .connect(signers.user)
+        .propose(targets, values, signatures, calldatas, description);
+      // mine a block
+      await mine();
+      // cast vote
+      // as the user has 500K votes and threshold is 400k it should be enough
+      const proposalId = await contracts.easeGovernance.proposalCount();
+      await contracts.easeGovernance
+        .connect(signers.user)
+        .castVote(proposalId, 1);
+
+      // mine upto voting period ends
+      await mineNBlocks(VOTING_PERIOD.toNumber());
+
+      // queue transaction
+      await contracts.easeGovernance.queue(proposalId);
+
+      // wait for time delay
+      await fastForward(TIME_IN_SECS.day * 2);
+      await mine();
+      // withdrawal delay should be 1 week
+      expect(await contracts.gvToken.withdrawalDelay()).to.equal(
+        TIME_IN_SECS.week
+      );
+      // execute transaction
+      expect(await contracts.easeGovernance.execute(proposalId))
+        .to.emit(contracts.easeGovernance, "ProposalExecuted")
+        .withArgs(proposalId);
+
+      // governance should update withdrawal delay to 4 Weeks after
+      // successful proposal execution. The reason being 4 weeks instead
+      // of 1 month is that withdrawal delay is mod of 1 week
+      expect(await contracts.gvToken.withdrawalDelay()).to.equal(
+        TIME_IN_SECS.week * 4
       );
     });
   });
