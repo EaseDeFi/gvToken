@@ -493,6 +493,7 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
 
     /* ========== INTERNAL FUNCTIONS ========== */
 
+    // TODO: discuss if this should be only gov
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     ///@notice Deposit EASE to obtain gvToken that grows upto
