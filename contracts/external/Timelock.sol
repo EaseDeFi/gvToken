@@ -4,6 +4,7 @@ pragma solidity 0.8.11;
 // solhint-disable not-rely-on-time
 // solhint-disable reason-string
 // solhint-disable no-empty-blocks
+// solhint-disable avoid-low-level-calls
 
 contract Timelock {
     event NewAdmin(address indexed newAdmin);
@@ -187,7 +188,6 @@ contract Timelock {
             );
         }
 
-        // solium-disable-next-line security/no-call-value
         (bool success, bytes memory returnData) = target.call{value: value}(
             callData
         );
