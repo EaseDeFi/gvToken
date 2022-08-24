@@ -36,7 +36,6 @@ describe("GvTokenV2", function () {
           easeAddress,
           RCA_CONTROLLER,
           tokenSwapAddress,
-          signers.gov.address,
           GENESIS,
         ],
         { kind: "uups" }
@@ -52,14 +51,7 @@ describe("GvTokenV2", function () {
   it("should initialize the contract", async function () {
     const addrZero = bribePotAddress;
     await expect(
-      contracts.gvToken.initialize(
-        addrZero,
-        addrZero,
-        addrZero,
-        addrZero,
-        addrZero,
-        1
-      )
+      contracts.gvToken.initialize(addrZero, addrZero, addrZero, addrZero, 1)
     ).to.be.reverted;
   });
   it("should upgrade the contract", async function () {

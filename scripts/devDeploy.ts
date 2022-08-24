@@ -120,7 +120,6 @@ async function main() {
         easeTokenAddress,
         RCA_CONTROLLER,
         tokenSwapAddress,
-        signers.user.address,
         GENESIS,
       ],
       { kind: "uups" }

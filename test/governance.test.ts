@@ -117,7 +117,6 @@ describe("EaseGovernance", function () {
           easeAddress,
           RCA_CONTROLLER,
           tokenSwapAddress,
-          timelockAddress,
           GENESIS,
         ],
         { kind: "uups" }
@@ -338,6 +337,9 @@ describe("EaseGovernance", function () {
       const aliceDepositVal = parseEther("600000");
       await depositFor(signers.alice, aliceDepositVal);
       await contracts.gvToken.connect(signers.alice).delegate(aliceAddress);
+
+      // transfer ownership of gvEase from deployer to timelock
+      await contracts.gvToken.transferOwnership(contracts.timelock.address);
     });
     it("should execute a proposal if conditions are met", async function () {
       await contracts.easeGovernance

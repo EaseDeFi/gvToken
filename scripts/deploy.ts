@@ -111,7 +111,6 @@ async function main() {
       easeTokenAddress,
       RCA_CONTROLLER,
       tokenSwapAddress,
-      signers.user.address,
       GENESIS,
     ],
     // TODO: discuss what to use transparent of uups
