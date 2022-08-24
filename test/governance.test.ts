@@ -26,13 +26,9 @@ import {
   TIME_IN_SECS,
 } from "./utils";
 
-chai.use(solidity);
+import { VOTING_DELAY, VOTING_PERIOD, PROPOSAL_THRESOLD } from "../constants";
 
-// wait 1 block before voting starts
-const VOTING_DELAY = BigNumber.from(1);
-// voting period in blocks (1 week approx)
-const VOTING_PERIOD = BigNumber.from(5760);
-const PROPOSAL_THRESOLD = parseEther("1000");
+chai.use(solidity);
 
 describe("EaseGovernance", function () {
   const contracts = {} as Contracts;
@@ -90,10 +86,6 @@ describe("EaseGovernance", function () {
     const bribePotAddress = getContractAddress({
       from: signers.deployer.address,
       nonce: deployerNonce + 1,
-    });
-    const timelockAddress = getContractAddress({
-      from: signers.deployer.address,
-      nonce: deployerNonce + 2,
     });
 
     const govAddress = getContractAddress({
