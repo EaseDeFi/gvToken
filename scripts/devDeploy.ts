@@ -113,14 +113,18 @@ async function main() {
 
   // Deploy gvToken
   contracts.gvToken = <GvToken>(
-    await upgrades.deployProxy(GvTokenFactory, [
-      bribePotAddress,
-      easeTokenAddress,
-      RCA_CONTROLLER,
-      tokenSwapAddress,
-      signers.user.address,
-      GENESIS,
-    ])
+    await upgrades.deployProxy(
+      GvTokenFactory,
+      [
+        bribePotAddress,
+        easeTokenAddress,
+        RCA_CONTROLLER,
+        tokenSwapAddress,
+        signers.user.address,
+        GENESIS,
+      ],
+      { kind: "uups" }
+    )
   );
   await contracts.gvToken.deployed();
   console.log(`Gv Token deployed at ${contracts.gvToken.address}`);

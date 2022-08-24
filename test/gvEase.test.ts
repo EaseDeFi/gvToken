@@ -86,14 +86,18 @@ describe("GvToken", function () {
     );
 
     contracts.gvToken = <GvToken>(
-      await upgrades.deployProxy(GvTokenFactory, [
-        bribePotAddress,
-        easeAddress,
-        RCA_CONTROLLER,
-        tokenSwapAddress,
-        signers.gov.address,
-        GENESIS,
-      ])
+      await upgrades.deployProxy(
+        GvTokenFactory,
+        [
+          bribePotAddress,
+          easeAddress,
+          RCA_CONTROLLER,
+          tokenSwapAddress,
+          signers.gov.address,
+          GENESIS,
+        ],
+        { kind: "uups" }
+      )
     );
 
     contracts.tokenSwap = <TokenSwap>(

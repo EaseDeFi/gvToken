@@ -28,8 +28,6 @@ async function main() {
   const accounts = await ethers.getSigners();
   signers.user = accounts[0];
 
-  console.log(`Address: ${await signers.user.getAddress()}`);
-  console.log(`Balance: ${await signers.user.getBalance()}`);
   const EASE_TOKEN_FACTORY = <EaseToken__factory>(
     await ethers.getContractFactory("EaseToken")
   );
@@ -106,15 +104,18 @@ async function main() {
   console.log(`Bribe Pot deployed at ${contracts.bribePot.address}`);
 
   // Deploy gvToken
-  contracts.gvToken = <GvToken>(
-    await upgrades.deployProxy(GvTokenFactory, [
+  contracts.gvToken = <GvToken>await upgrades.deployProxy(
+    GvTokenFactory,
+    [
       bribePotAddress,
       easeTokenAddress,
       RCA_CONTROLLER,
       tokenSwapAddress,
       signers.user.address,
       GENESIS,
-    ])
+    ],
+    // TODO: discuss what to use transparent of uups
+    { kind: "uups" }
   );
   await contracts.gvToken.deployed();
   console.log(`Gv Token deployed at ${contracts.gvToken.address}`);

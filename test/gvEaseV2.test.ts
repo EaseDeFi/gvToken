@@ -29,14 +29,18 @@ describe("GvTokenV2", function () {
       await ethers.getContractFactory("GvToken")
     );
     contracts.gvToken = <GvToken>(
-      await upgrades.deployProxy(GvTokenFactory, [
-        bribePotAddress,
-        easeAddress,
-        RCA_CONTROLLER,
-        tokenSwapAddress,
-        signers.gov.address,
-        GENESIS,
-      ])
+      await upgrades.deployProxy(
+        GvTokenFactory,
+        [
+          bribePotAddress,
+          easeAddress,
+          RCA_CONTROLLER,
+          tokenSwapAddress,
+          signers.gov.address,
+          GENESIS,
+        ],
+        { kind: "uups" }
+      )
     );
   });
   it("should deploy the contract", async function () {
