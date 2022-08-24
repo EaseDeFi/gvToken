@@ -1,14 +1,14 @@
 /// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.11;
 
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IRcaController.sol";
 
 // solhint-disable not-rely-on-time
 
 contract BribePot {
-    using SafeERC20 for IERC20Permit;
+    using SafeERC20Upgradeable for IERC20Permit;
 
     /* ========== structs ========== */
     struct BribeDetail {

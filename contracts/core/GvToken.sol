@@ -1,12 +1,12 @@
 /// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.11;
 
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import "../interfaces/IERC20.sol";
+import {IERC20Permit} from "../interfaces/IERC20.sol";
 import "../interfaces/IGvToken.sol";
 import "../interfaces/IBribePot.sol";
 import "../interfaces/IRcaController.sol";
@@ -20,13 +20,8 @@ import "./Delegable.sol";
 // solhint-disable no-inline-assembly
 // solhint-disable no-empty-blocks
 
-contract GvToken is
-    Delegable,
-    Initializable,
-    UUPSUpgradeable,
-    OwnableUpgradeable
-{
-    using SafeERC20 for IERC20Permit;
+contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
+    using SafeERC20Upgradeable for IERC20Permit;
 
     /* ========== STRUCTS ========== */
     struct MetaData {
@@ -79,14 +74,14 @@ contract GvToken is
     /// @notice total amount of EASE deposited
     uint256 public totalDeposited;
     /// @notice Time delay for withdrawals which will be set by governance
-    uint256 public withdrawalDelay = 7 days;
+    uint256 public withdrawalDelay;
 
     /// @notice total supply of gvToken
     uint256 private _totalSupply;
     /// @notice merkle root of vArmor stakers for giving them
     /// extra deposit start time
     bytes32 private _powerRoot;
-    MetaData private metadata = MetaData("Growing Vote Ease", "gvEase", 18);
+    MetaData private metadata;
     /// @notice Request by users for withdrawals.
     mapping(address => WithdrawRequest) public withdrawRequests;
     /// @notice amount of gvToken bribed to bribe Pot
@@ -142,12 +137,15 @@ contract GvToken is
         address _gov,
         uint256 _genesis
     ) external initializer {
+        __Ownable_init();
         pot = IBribePot(_pot);
         stakingToken = IERC20Permit(_stakingToken);
         rcaController = IRcaController(_rcaController);
         tokenSwap = ITokenSwap(_tokenSwap);
         gov = _gov;
         genesis = uint32((_genesis / WEEK) * WEEK);
+        withdrawalDelay = 7 days;
+        metadata = MetaData("Growing Vote Ease", "gvEase", 18);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
