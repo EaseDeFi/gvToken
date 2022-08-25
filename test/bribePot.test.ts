@@ -2,6 +2,8 @@ import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { ethers } from "hardhat";
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+
 import { EaseToken__factory } from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
 import { RCA_CONTROLLER, RCA_VAULT } from "./constants";
@@ -732,7 +734,9 @@ describe("BribePot", function () {
       );
 
       // call get reward function
-      await contracts.bribePot.getReward(bobAddress, false);
+      await expect(contracts.bribePot.getReward(bobAddress, false))
+        .to.emit(contracts.bribePot, "RewardPaid")
+        .withArgs(bobAddress, anyValue);
       const gvTokenEaseBalanceAfter = await contracts.ease.balanceOf(
         signers.gvToken.address
       );
@@ -749,7 +753,9 @@ describe("BribePot", function () {
       const bobEaseBalBefore = await contracts.ease.balanceOf(bobAddress);
 
       // call get reward function
-      await contracts.bribePot.getReward(bobAddress, true);
+      await expect(contracts.bribePot.getReward(bobAddress, true))
+        .to.emit(contracts.bribePot, "RewardPaid")
+        .withArgs(bobAddress, anyValue);
       const bobEaseBalAfter = await contracts.ease.balanceOf(bobAddress);
       expect(bobEaseBalAfter.sub(bobEaseBalBefore)).to.gte(parseEther("11"));
     });
