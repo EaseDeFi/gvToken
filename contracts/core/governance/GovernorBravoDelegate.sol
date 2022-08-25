@@ -15,12 +15,11 @@ contract GovernorBravoDelegate is
     /// @notice The name of this contract
     string public constant name = "Ease Governor Bravo";
 
-    // TODO: change constants to meet gvEase requirements
     /// @notice The minimum setable proposal threshold
-    uint256 public constant MIN_PROPOSAL_THRESHOLD = 1000e18; // 1,000 gvEase
+    uint256 public constant MIN_PROPOSAL_THRESHOLD = 100_000e18; // 100,000 gvEase
 
     /// @notice The maximum setable proposal threshold
-    uint256 public constant MAX_PROPOSAL_THRESHOLD = 100000e18; //100,000 gvEase
+    uint256 public constant MAX_PROPOSAL_THRESHOLD = 10_000_000e18; //10,000,000 gvEase
 
     /// @notice The minimum setable voting period
     uint256 public constant MIN_VOTING_PERIOD = 5760; // About 24 hours
@@ -36,7 +35,7 @@ contract GovernorBravoDelegate is
 
     /// @notice The number of votes in support of a proposal required in
     /// order for a quorum to be reached and for a vote to succeed
-    uint256 public constant quorumVotes = 400000e18; // 400,000 = 4% of gvEase
+    uint256 public quorumVotes;
 
     /// @notice The maximum number of actions that can be included in a proposal
     uint256 public constant proposalMaxOperations = 10; // 10 actions
@@ -100,6 +99,8 @@ contract GovernorBravoDelegate is
         votingPeriod = votingPeriod_;
         votingDelay = votingDelay_;
         proposalThreshold = proposalThreshold_;
+        // initializing quorum votes
+        quorumVotes = 400000e18; // 400,000 gvEase initial
     }
 
     /**
@@ -525,6 +526,27 @@ contract GovernorBravoDelegate is
         votingDelay = newVotingDelay;
 
         emit VotingDelaySet(oldVotingDelay, votingDelay);
+    }
+
+    function _setQuorumVotes(uint256 newQuorumVotes) external {
+        require(
+            msg.sender == admin,
+            "GovernorBravo::_setVotingPeriod: admin only"
+        );
+        uint256 totalSupply = gvEase.totalSupply();
+        // quoroum should be more than 5% of gvToken
+        uint256 minQuorumVotes = (totalSupply * 5) / 100;
+        // quoroum should be less than 50% of gvToken
+        uint256 maxQuorumVotes = (totalSupply * 50) / 100;
+
+        require(
+            newQuorumVotes > minQuorumVotes && newQuorumVotes < maxQuorumVotes,
+            "GovernorBravo::_setQuorumVotes: invalid quorum amount"
+        );
+        uint256 oldQuorumVotes = quorumVotes;
+        quorumVotes = newQuorumVotes;
+
+        emit QuorumVotesSet(oldQuorumVotes, newQuorumVotes);
     }
 
     /**

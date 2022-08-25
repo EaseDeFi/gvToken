@@ -476,4 +476,49 @@ describe("EaseGovernance", function () {
       ).to.be.reverted;
     });
   });
+  describe("_setQuorumVotes()", function () {
+    beforeEach(async function () {
+      // deposit to gvEase for the user
+      const userDepositVal = parseEther("500000");
+      await depositFor(signers.user, userDepositVal);
+
+      // deposit for alice
+      const aliceDepositVal = parseEther("600000");
+      await depositFor(signers.alice, aliceDepositVal);
+    });
+    it("should update quorumVotes", async function () {
+      const totalSupply = await contracts.gvToken.totalSupply();
+      const newQuorumVotes = totalSupply.mul(10).div(100);
+      const oldQuorumVotes = await contracts.easeGovernance.quorumVotes();
+      await expect(
+        contracts.easeGovernance
+          .connect(signers.guardian)
+          ._setQuorumVotes(newQuorumVotes)
+      )
+        .to.emit(contracts.easeGovernance, "QuorumVotesSet")
+        .withArgs(oldQuorumVotes, newQuorumVotes);
+    });
+    it("should fail if new quorum votes is less than 5% of gvEase total supply", async function () {
+      const totalSupply = await contracts.gvToken.totalSupply();
+      const newQuorumVotes = totalSupply.mul(4).div(100);
+      await expect(
+        contracts.easeGovernance
+          .connect(signers.guardian)
+          ._setQuorumVotes(newQuorumVotes)
+      ).to.revertedWith(
+        "GovernorBravo::_setQuorumVotes: invalid quorum amount"
+      );
+    });
+    it("should fail if new quorum votes is more than 50% of gvEase total supply", async function () {
+      const totalSupply = await contracts.gvToken.totalSupply();
+      const newQuorumVotes = totalSupply.mul(51).div(100);
+      await expect(
+        contracts.easeGovernance
+          .connect(signers.guardian)
+          ._setQuorumVotes(newQuorumVotes)
+      ).to.revertedWith(
+        "GovernorBravo::_setQuorumVotes: invalid quorum amount"
+      );
+    });
+  });
 });

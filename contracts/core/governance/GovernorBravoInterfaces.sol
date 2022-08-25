@@ -44,6 +44,9 @@ contract GovernorBravoEvents {
     /// @notice An event emitted when the voting delay is set
     event VotingDelaySet(uint256 oldVotingDelay, uint256 newVotingDelay);
 
+    /// @notice An event emitted when the quorum vote amount is set
+    event QuorumVotesSet(uint256 oldQuorumVotes, uint256 newQuorumVotes);
+
     /// @notice An event emitted when the voting period is set
     event VotingPeriodSet(uint256 oldVotingPeriod, uint256 newVotingPeriod);
 
