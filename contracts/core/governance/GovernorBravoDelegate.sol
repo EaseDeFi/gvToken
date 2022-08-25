@@ -528,6 +528,10 @@ contract GovernorBravoDelegate is
         emit VotingDelaySet(oldVotingDelay, votingDelay);
     }
 
+    /**
+     * @notice Admin function for setting the quorum votes
+     * @param newQuorumVotes new quorum votes in gvEASE amount
+     */
     function _setQuorumVotes(uint256 newQuorumVotes) external {
         require(
             msg.sender == admin,
