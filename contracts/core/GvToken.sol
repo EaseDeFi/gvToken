@@ -69,8 +69,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     ITokenSwap public tokenSwap;
     /// @notice Timestamp rounded in weeks for earliest vArmor staker
     uint32 public genesis;
-    /// @notice ease governance
-    address public gov;
     /// @notice total amount of EASE deposited
     uint256 public totalDeposited;
     /// @notice Time delay for withdrawals which will be set by governance
@@ -113,12 +111,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 percentage
     );
 
-    /* ========== MODIFIERS ========== */
-    modifier onlyGov() {
-        require(msg.sender == gov, "only gov");
-        _;
-    }
-
     /* ========== INITIALIZE ========== */
     /// @notice Initialize a new gvToken.
     /// @param _pot Address of a bribe pot.
@@ -127,14 +119,12 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     /// @param _rcaController Address of a RCA controller needed for verifying
     /// active rca vaults.
     /// @param _tokenSwap VArmor to EASE token swap address
-    /// @param _gov Governance Addresss.
     /// @param _genesis Deposit time of first vArmor holder.
     function initialize(
         address _pot,
         address _stakingToken,
         address _rcaController,
         address _tokenSwap,
-        address _gov,
         uint256 _genesis
     ) external initializer {
         __Ownable_init();
@@ -142,7 +132,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         stakingToken = IERC20Permit(_stakingToken);
         rcaController = IRcaController(_rcaController);
         tokenSwap = ITokenSwap(_tokenSwap);
-        gov = _gov;
         genesis = uint32((_genesis / WEEK) * WEEK);
         withdrawalDelay = 7 days;
         metadata = MetaData("Growing Vote Ease", "gvEase", 18);
@@ -384,13 +373,13 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
 
     /// @notice Set root for vArmor holders to get earlier deposit start time.
     /// @param root Merkle root of the vArmor holders.
-    function setPower(bytes32 root) external onlyGov {
+    function setPower(bytes32 root) external onlyOwner {
         _powerRoot = root;
     }
 
     /// @notice Change withdrawal delay
     /// @param time Delay time in seconds
-    function setDelay(uint256 time) external onlyGov {
+    function setDelay(uint256 time) external onlyOwner {
         time = (time / 1 weeks) * 1 weeks;
         require(time > 1 weeks, "min delay 7 days");
         withdrawalDelay = time;
@@ -398,7 +387,7 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
 
     /// @notice Update total supply for ecosystem wide grown part
     /// @param newTotalSupply New total supply.(should be > existing supply)
-    function setTotalSupply(uint256 newTotalSupply) external onlyGov {
+    function setTotalSupply(uint256 newTotalSupply) external onlyOwner {
         uint256 totalEaseDeposit = totalDeposited;
 
         require(

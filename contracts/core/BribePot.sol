@@ -153,8 +153,8 @@ contract BribePot {
 
             // if user wants to reDeposit transfer to gvToken else
             // transfer to user's wallet
-            user = toUser ? user : gvToken;
-            rewardsToken.safeTransfer(user, reward);
+            address to = toUser ? user : gvToken;
+            rewardsToken.safeTransfer(to, reward);
 
             emit RewardPaid(user, reward);
         }

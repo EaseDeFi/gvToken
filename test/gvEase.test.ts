@@ -93,7 +93,6 @@ describe("GvToken", function () {
           easeAddress,
           RCA_CONTROLLER,
           tokenSwapAddress,
-          signers.gov.address,
           GENESIS,
         ],
         { kind: "uups" }
@@ -230,9 +229,9 @@ describe("GvToken", function () {
   });
   describe("restricted", function () {
     it("should not allow other address to call restricted functions", async function () {
-      await expect(contracts.gvToken.setPower(randomBytes(32))).to.revertedWith(
-        "only gov"
-      );
+      await expect(
+        contracts.gvToken.connect(signers.bob).setPower(randomBytes(32))
+      ).to.revertedWith("Ownable: caller is not the owner");
     });
   });
 
@@ -470,7 +469,7 @@ describe("GvToken", function () {
           },
         ]);
         const root = powerTree.getHexRoot();
-        await contracts.gvToken.connect(signers.gov).setPower(root);
+        await contracts.gvToken.setPower(root);
       });
       describe("depositWithVArmor()", function () {
         it("should allow vArmor hodler to directly get gvEase", async function () {
@@ -1356,9 +1355,9 @@ describe("GvToken", function () {
 
   describe("setTotalSupply()", function () {
     it("should allow governance to update total supply only within bounds", async function () {
-      await expect(
-        contracts.gvToken.connect(signers.gov).setTotalSupply(1)
-      ).to.revertedWith("not in range");
+      await expect(contracts.gvToken.setTotalSupply(1)).to.revertedWith(
+        "not in range"
+      );
 
       // deposit fast forward and update
       const depositAmount = parseEther("200");
@@ -1370,27 +1369,25 @@ describe("GvToken", function () {
       // user deposit balance by this time should be at least
       // grown by 30 gvEASE we update total supply using governance
       const userBalance = await contracts.gvToken.balanceOf(userAddress);
-      await contracts.gvToken.connect(signers.gov).setTotalSupply(userBalance);
+      await contracts.gvToken.setTotalSupply(userBalance);
 
       await expect(
-        contracts.gvToken
-          .connect(signers.gov)
-          .setTotalSupply(userBalance.sub(1000))
+        contracts.gvToken.setTotalSupply(userBalance.sub(1000))
       ).to.revertedWith("existing > new amount");
     });
   });
   describe("setDelay()", function () {
     it("should set withdrawal delay", async function () {
       const newDelay = TIME_IN_SECS.week * 3;
-      await contracts.gvToken.connect(signers.gov).setDelay(newDelay);
+      await contracts.gvToken.setDelay(newDelay);
       const updatedDelay = await contracts.gvToken.withdrawalDelay();
       expect(updatedDelay).to.equal(newDelay);
     });
     it("should not set withdrawal delay less than 7 days", async function () {
       const newDelay = TIME_IN_SECS.day * 3;
-      await expect(
-        contracts.gvToken.connect(signers.gov).setDelay(newDelay)
-      ).to.revertedWith("min delay 7 days");
+      await expect(contracts.gvToken.setDelay(newDelay)).to.revertedWith(
+        "min delay 7 days"
+      );
     });
   });
   describe("setPower()", function () {
@@ -1412,7 +1409,7 @@ describe("GvToken", function () {
         },
       ]);
       const root = powerTree.getHexRoot();
-      await contracts.gvToken.connect(signers.gov).setPower(root);
+      await contracts.gvToken.setPower(root);
     });
   });
 });

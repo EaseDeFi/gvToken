@@ -14,11 +14,14 @@
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.5",
     "@nomiclabs/hardhat-etherscan": "^3.0.3",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
     "@openzeppelin/contract-loader": "^0.6.3",
     "@openzeppelin/contracts": "^4.6.0",
+    "@openzeppelin/contracts-upgradeable": "^4.7.2",
+    "@openzeppelin/hardhat-upgrades": "^1.20.0",
     "@openzeppelin/test-helpers": "^0.5.15",
     "@typechain/ethers-v5": "^10.0.0",
     "@typechain/hardhat": "^6.0.0",
@@ -29,6 +32,7 @@
     "@typescript-eslint/parser": "^5.12.1",
     "chai": "^4.3.6",
     "cross-env": "^7.0.3",
+    "dayjs": "^1.11.3",
     "dotenv": "^16.0.0",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.5.0",
@@ -49,10 +53,6 @@
     "solidity-coverage": "^0.7.21",
     "ts-node": "^10.7.0",
     "typechain": "^8.0.0",
-    "typescript": "^4.6.4",
-    "@openzeppelin/contracts-upgradeable": "^4.7.2",
-    "@openzeppelin/hardhat-upgrades": "^1.20.0",
-    "dayjs": "^1.11.3"
-  },
-  "dependencies": {}
+    "typescript": "^4.6.4"
+  }
 }
