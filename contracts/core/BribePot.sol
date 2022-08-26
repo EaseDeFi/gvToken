@@ -176,7 +176,6 @@ contract BribePot {
         require(_totalSupply > 0, "nothing to bribe");
 
         require(rcaController.activeShields(vault), "inactive vault");
-        // update
 
         uint256 startWeek = ((block.timestamp - genesis) / WEEK) + 1;
         uint256 endWeek = startWeek + numOfWeeks;
@@ -186,6 +185,10 @@ contract BribePot {
             bribes[briber][vault].endWeek <= _getCurrWeek(),
             "bribe already exists"
         );
+
+        // transfer amount to bribe pot
+        uint256 amount = bribeRate * numOfWeeks;
+        _transferRewardToken(briber, amount, permit);
 
         bribes[briber][vault] = BribeDetail(
             uint112(bribeRate),
@@ -201,10 +204,6 @@ contract BribePot {
         if (bribeFinish > periodFinish) {
             periodFinish = bribeFinish;
         }
-
-        // transfer amount to bribe pot
-        uint256 amount = bribeRate * numOfWeeks;
-        _transferRewardToken(briber, amount, permit);
 
         emit BribeAdded(briber, vault, bribeRate, startWeek, endWeek);
     }

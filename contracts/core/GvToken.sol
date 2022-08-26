@@ -502,8 +502,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     ) internal {
         require(amount > 0, "cannot deposit 0!");
 
-        _updateBalances(user, amount, depositStart);
-
         // we only transfer tokens from user if they are
         // depositing from their external wallet if this
         // function is called by claimAndDepositReward we don't
@@ -512,6 +510,8 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         if (!fromBribePot) {
             _transferStakingToken(user, amount, permit);
         }
+
+        _updateBalances(user, amount, depositStart);
 
         emit Deposited(user, amount);
     }
