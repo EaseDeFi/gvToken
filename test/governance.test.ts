@@ -96,7 +96,7 @@ describe("EaseGovernance", function () {
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
     contracts.ease = await EaseTokenFactory.connect(
       signers.easeDeployer
-    ).deploy();
+    ).deploy(govAddress);
     const easeAddress = contracts.ease.address;
     // As we will not call depositWithVarmor or depositWithArmor
     const tokenSwapAddress = easeAddress;

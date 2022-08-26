@@ -76,7 +76,7 @@ describe("GvToken", function () {
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
     contracts.ease = await EaseTokenFactory.connect(
       signers.easeDeployer
-    ).deploy();
+    ).deploy(signers.gov.address);
     const easeAddress = contracts.ease.address;
 
     contracts.bribePot = await BribePotFactory.deploy(
