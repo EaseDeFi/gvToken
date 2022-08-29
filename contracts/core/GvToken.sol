@@ -47,10 +47,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         uint128 amount;
         uint128 storedAt;
     }
-    struct GrowthRate {
-        uint128 start;
-        uint128 expire;
-    }
     struct DelegateDetails {
         address reciever;
         uint256 amount;
