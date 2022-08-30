@@ -96,6 +96,10 @@ async function main() {
     from: signers.deployer.address,
     nonce: nonce + 4,
   });
+  const timelockAddress = getContractAddress({
+    from: signers.deployer.address,
+    nonce: nonce + 5,
+  });
 
   const govAddress = getContractAddress({
     from: signers.deployer.address,
@@ -114,7 +118,7 @@ async function main() {
   console.log(`TokenSwap deployed at ${contracts.tokenSwap.address}`);
   // deploy ease token
   contracts.ease = <EaseToken>(
-    await EASE_TOKEN_FACTORY.connect(signers.deployer).deploy()
+    await EASE_TOKEN_FACTORY.connect(signers.deployer).deploy(timelockAddress)
   );
   await contracts.ease.deployed();
   console.log(`Ease Token deployed at ${contracts.ease.address}`);
