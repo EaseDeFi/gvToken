@@ -115,6 +115,7 @@ const config: HardhatUserConfig = {
     mainnet: getChainConfig("mainnet"),
     optimism: getChainConfig("optimism"),
     rinkeby: getChainConfig("rinkeby"),
+    goerli: getChainConfig("goerli"),
     tenderly: {
       url: process.env.TENDERLY_FORK || "",
       accounts: process.env.MAINNET_PRIVATE_KEY
