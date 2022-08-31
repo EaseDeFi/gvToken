@@ -37,6 +37,7 @@ contract BribePot {
     uint256 private constant MULTIPLIER = 1e18;
 
     /* ========== STATE ========== */
+    string public name = "Ease Bribe Pot";
     IERC20Permit public immutable rewardsToken;
     IRcaController public immutable rcaController;
     address public gvToken;
