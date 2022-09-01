@@ -47,7 +47,7 @@ describe("BribePot", function () {
       nonce,
     });
 
-    contracts.ease = await EaseTokenFactory.deploy();
+    contracts.ease = await EaseTokenFactory.deploy(signers.gov.address);
 
     contracts.bribePot = await BribePotFactory.deploy(
       signers.gvToken.address,

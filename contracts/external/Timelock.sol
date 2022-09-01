@@ -42,6 +42,7 @@ contract Timelock {
     address public admin;
     address public pendingAdmin;
     uint256 public delay;
+    string public name = "Ease Timelock";
 
     mapping(bytes32 => bool) public queuedTransactions;
 

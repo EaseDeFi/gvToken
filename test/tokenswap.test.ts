@@ -80,7 +80,7 @@ describe("TokenSwap", function () {
       )
     );
     contracts.ease = <EaseToken>(
-      await EASE_TOKEN_FACTORY.connect(signers.user).deploy()
+      await EASE_TOKEN_FACTORY.connect(signers.user).deploy(signers.gov.address)
     );
     await contracts.ease
       .connect(signers.user)
@@ -230,7 +230,7 @@ describe("EaseToken", function () {
     );
 
     contracts.ease = <EaseToken>(
-      await EASE_TOKEN_FACTORY.connect(signers.user).deploy()
+      await EASE_TOKEN_FACTORY.connect(signers.user).deploy(signers.gov.address)
     );
   });
 
@@ -250,6 +250,9 @@ describe("EaseToken", function () {
 
       expect(deployerBalance).to.equal(expectedTotalSupply);
     });
+    it("should set the owner correctly", async function () {
+      expect(await contracts.ease.owner()).to.equal(signers.gov.address);
+    });
   });
   describe("burn()", function () {
     it("should allow user to burn ease tokens", async function () {
@@ -259,6 +262,46 @@ describe("EaseToken", function () {
       await contracts.ease.connect(signers.user).burn(burnAmt);
       const balanceAfter = await contracts.ease.balanceOf(userAddress);
       expect(balanceBefore.sub(balanceAfter)).to.equal(burnAmt);
+    });
+  });
+  describe("mint()", function () {
+    it("should mint 250 Million EASE token to the governance address", async function () {
+      const mintAmount = parseEther("250000000");
+      const govAddress = signers.gov.address;
+      const balanceBefore = await contracts.ease.balanceOf(govAddress);
+      // owner should be gov before minting
+      expect(await contracts.ease.owner()).to.equal(govAddress);
+
+      await contracts.ease.connect(signers.gov).mint();
+      const balanceAfter = await contracts.ease.balanceOf(govAddress);
+
+      expect(balanceAfter.sub(balanceBefore)).to.equal(mintAmount);
+
+      // ownership should be renouncence if successfully minted
+      expect(await contracts.ease.owner()).to.equal(
+        ethers.constants.AddressZero
+      );
+    });
+    it("should fail if caller is not gov", async function () {
+      await expect(contracts.ease.mint()).to.revertedWith("Only owner!");
+    });
+  });
+  describe("renounceOwnerShip()", function () {
+    it("should allow owner to renounce ownership", async function () {
+      const govAddress = signers.gov.address;
+      expect(await contracts.ease.owner()).to.equal(govAddress);
+
+      await contracts.ease.connect(signers.gov).renounceOwnership();
+
+      expect(await contracts.ease.owner()).to.equal(
+        ethers.constants.AddressZero
+      );
+    });
+
+    it("should fail if the caller is not the owner", async function () {
+      await expect(contracts.ease.renounceOwnership()).to.revertedWith(
+        "Only owner!"
+      );
     });
   });
 });

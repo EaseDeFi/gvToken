@@ -11,6 +11,7 @@ contract TokenSwap {
     IEaseToken public immutable ease;
     IERC20 public immutable armor;
     IVArmor public immutable vArmor;
+    string public name = "Ease Token Swap";
 
     constructor(
         address ease_,

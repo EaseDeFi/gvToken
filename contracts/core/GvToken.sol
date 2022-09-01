@@ -47,10 +47,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         uint128 amount;
         uint128 storedAt;
     }
-    struct GrowthRate {
-        uint128 start;
-        uint128 expire;
-    }
     struct DelegateDetails {
         address reciever;
         uint256 amount;
@@ -82,8 +78,8 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     MetaData private metadata;
     /// @notice Request by users for withdrawals.
     mapping(address => WithdrawRequest) public withdrawRequests;
-    /// @notice amount of gvToken bribed to bribe Pot
-    mapping(address => uint256) public bribedAmount;
+    /// @notice amount of gvToken leased to bribe Pot
+    mapping(address => uint256) public leasedAmount;
 
     /// @notice User deposits of ease tokens
     mapping(address => Deposit[]) private _deposits;
@@ -290,11 +286,11 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         // get rewards against it
         address user = msg.sender;
         uint256 totalPower = balanceOf(user);
-        uint256 bribed = bribedAmount[user];
+        uint256 leased = leasedAmount[user];
 
-        require(totalPower >= (amount + bribed), "not enough power");
+        require(totalPower >= (amount + leased), "not enough power");
 
-        bribedAmount[user] += amount;
+        leasedAmount[user] += amount;
 
         pot.deposit(user, amount);
     }
@@ -303,7 +299,7 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     /// @param amount Amount in gvToken to withdraw from bribe pot
     function withdrawFromPot(uint256 amount) external {
         // withdraws user gvToken from bribe pot
-        bribedAmount[msg.sender] -= amount;
+        leasedAmount[msg.sender] -= amount;
         pot.withdraw(msg.sender, amount);
     }
 
@@ -320,7 +316,7 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 amount;
 
         PermitArgs memory permit;
-        if (bribedAmount[user] > 0) {
+        if (leasedAmount[user] > 0) {
             amount = pot.getReward(user, false);
         }
         if (amount > 0) {
@@ -428,8 +424,8 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         returns (uint256)
     {
         uint256 gvBalance = balanceOf(user);
-        uint256 bribed = bribedAmount[user];
-        return _percentToGvPower(_stakes[vault][user], gvBalance, bribed);
+        uint256 leased = leasedAmount[user];
+        return _percentToGvPower(_stakes[vault][user], gvBalance, leased);
     }
 
     ///@notice Calcualtes amount of gvToken that is available for stake
@@ -440,13 +436,21 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         returns (uint256)
     {
         uint256 gvBalance = balanceOf(user);
-        uint256 bribed = bribedAmount[user];
-        uint256 totalStaked = _percentToGvPower(
+        uint256 leased = leasedAmount[user];
+        uint256 stakedTotal = _percentToGvPower(
             _totalStaked[user],
             gvBalance,
-            bribed
+            leased
         );
-        return (gvBalance - (totalStaked + bribed));
+        return (gvBalance - (stakedTotal + leased));
+    }
+
+    ///@notice Calculates total staked amount of a user
+    ///@return total gvPower staked
+    function totalStaked(address user) external view returns (uint256 total) {
+        uint256 gvBalance = balanceOf(user);
+        uint256 bribed = leasedAmount[user];
+        total = _percentToGvPower(_totalStaked[user], gvBalance, bribed);
     }
 
     /// @notice Get total ease deposited by user
@@ -502,8 +506,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     ) internal {
         require(amount > 0, "cannot deposit 0!");
 
-        _updateBalances(user, amount, depositStart);
-
         // we only transfer tokens from user if they are
         // depositing from their external wallet if this
         // function is called by claimAndDepositReward we don't
@@ -512,6 +514,8 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         if (!fromBribePot) {
             _transferStakingToken(user, amount, permit);
         }
+
+        _updateBalances(user, amount, depositStart);
 
         emit Deposited(user, amount);
     }
@@ -573,16 +577,16 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 gvAmountToWithdraw,
         uint256 userTotalGvBal
     ) internal {
-        uint256 totalBribed = bribedAmount[user];
-        uint256 gvAmtAvailableForBribe = userTotalGvBal - totalBribed;
+        uint256 totalLeased = leasedAmount[user];
+        uint256 gvAmtAvailableForBribe = userTotalGvBal - totalLeased;
         // whether user is willing to withdraw from bribe pot
         // we will not add reward amount to withdraw if user doesn't
         // want to withdraw from bribe pot
-        if (totalBribed > 0 && gvAmountToWithdraw > gvAmtAvailableForBribe) {
+        if (totalLeased > 0 && gvAmountToWithdraw > gvAmtAvailableForBribe) {
             uint256 amtToWithdrawFromPot = gvAmountToWithdraw -
                 gvAmtAvailableForBribe;
             pot.withdraw(user, amtToWithdrawFromPot);
-            bribedAmount[user] -= amtToWithdrawFromPot;
+            leasedAmount[user] -= amtToWithdrawFromPot;
         }
     }
 

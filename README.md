@@ -10,6 +10,14 @@
 4. Compile contracts - `npm run compile`
 5. Run tests - `npm test` (_Make sure the block number in `.env` is 14740073_)
 6. Deploy contracts:-
-   - Forked Mainnet Hardhat: `npx hardhat run scripts/deploy.ts`
-   - Locally Forked Node: `npx hardhat node` && `npx hardhat run scripts/deploy.ts --network localhost`
-   - Tenderly Fork - (_Note: make sure account MAINNET_PRIVATE_KEY in .env has at least 20K armor and 1 eth on that tenderly fork_) `npx hardhat run scripts/deploy.ts --network tenderly`
+
+   - DEV DEVELOPMENT
+
+     - Forked Mainnet Hardhat: `npx hardhat run scripts/devDeploy.ts`
+     - Locally Forked Node: `npx hardhat node` && `npx hardhat run scripts/devDeploy.ts --network localhost`
+     - Tenderly Fork - (_Note: make sure account MAINNET_PRIVATE_KEY in .env has at least 20K armor and 1 eth on that tenderly fork_) `npx hardhat run scripts/devDeploy.ts --network tenderly`
+
+   - PROD
+     - Forked Mainnet Hardhat: `npx hardhat run scripts/deploy.ts`
+     - Locally Forked Node: `npx hardhat node` && `npx hardhat run scripts/deploy.ts --network localhost`
+     - Other Networks: `npx hardhat run scripts/deploy.ts --network networkName`
