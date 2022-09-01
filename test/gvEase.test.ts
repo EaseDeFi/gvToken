@@ -699,7 +699,6 @@ describe("GvToken", function () {
       const value = parseEther("100");
       // deposit bob
       await depositFor(signers.bob, value);
-
       // deposit user
       await depositFor(signers.user, value);
 
@@ -744,6 +743,61 @@ describe("GvToken", function () {
         timeNeededToReachWeek1.add(TIME_IN_SECS.week).toNumber()
       );
       await mine();
+    });
+    it("should return the exact staked gvEASE amount", async function () {
+      // deposit 100 $EASE for alice
+      const signerA = signers.otherAccounts[0];
+      const signerB = signers.otherAccounts[1];
+      const amount = parseEther("100");
+
+      // Fund signers with ease balance
+      await contracts.ease
+        .connect(signers.easeDeployer)
+        .transfer(signerA.address, amount);
+      await contracts.ease
+        .connect(signers.easeDeployer)
+        .transfer(signerB.address, amount);
+
+      // deposit for A
+      await depositFor(signerA, amount);
+      // deposit for B
+      await depositFor(signerB, amount);
+
+      const fiftyPercent = BigNumber.from(50000);
+      //user A stakes 50% to rca vault
+      await contracts.gvToken.connect(signerA).stake(fiftyPercent, RCA_VAULT);
+
+      //user B stakes 50% to rca vault
+      await contracts.gvToken.connect(signerB).stake(fiftyPercent, RCA_VAULT);
+
+      // User B leases 50 $gvEase to bribe pot
+      const leaseAmount = parseEther("50");
+      await contracts.gvToken.connect(signerB).depositToPot(leaseAmount);
+      let expectedStakeAmountOfA = parseEther("50");
+      let totalStakedA = await contracts.gvToken.totalStaked(signerA.address);
+      expect(totalStakedA).to.gte(expectedStakeAmountOfA);
+
+      // the reason staked amount for signerB becomes 25 $gvEASE is because
+      // 50 $gvEASE has been leased and total $gvEASE that can be staked is
+      // 50 $gvEASE at current time so 50% of 50 $gvEASE = 25 $gvEASE
+      let expectedStakeAmountOfB = parseEther("25");
+      let totalStakedB = await contracts.gvToken.totalStaked(signerB.address);
+      expect(totalStakedB).to.gte(expectedStakeAmountOfB);
+
+      // Wait for 6 months
+      await fastForward(TIME_IN_SECS.year / 2);
+      await mine();
+
+      expectedStakeAmountOfA = parseEther("75");
+      totalStakedA = await contracts.gvToken.totalStaked(signerA.address);
+      expect(totalStakedA).to.gte(expectedStakeAmountOfA);
+
+      // the reason staked amount for signerB becomes 50 $gvEASE is because
+      // 50 $gvEASE has been leased and total $gvEASE that can be staked is
+      // 100 $gvEASE at current time so 50% of 100 $gvEASE = 50 $gvEASE
+      expectedStakeAmountOfB = parseEther("50");
+      totalStakedB = await contracts.gvToken.totalStaked(signerB.address);
+      expect(totalStakedB).to.gte(expectedStakeAmountOfB);
     });
     it("should emit Stake event on successful stake", async function () {
       // stake to a vault
