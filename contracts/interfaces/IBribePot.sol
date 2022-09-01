@@ -11,7 +11,7 @@ interface IBribePot {
     }
 
     /* ========== EVENTS ========== */
-    event Deposited(address indexed user, uint256 amount);
+    event Leased(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
     event BribeAdded(

@@ -68,7 +68,7 @@ contract BribePot {
     mapping(address => uint256) private _balances;
 
     /* ========== EVENTS ========== */
-    event Deposited(address indexed user, uint256 amount);
+    event Leased(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
     event BribeAdded(
@@ -119,7 +119,7 @@ contract BribePot {
         _totalSupply += amount;
         _balances[from] += amount;
 
-        emit Deposited(from, amount);
+        emit Leased(from, amount);
     }
 
     ///@notice Withdraw gvEase of user
