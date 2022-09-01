@@ -437,12 +437,20 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     {
         uint256 gvBalance = balanceOf(user);
         uint256 bribed = bribedAmount[user];
-        uint256 totalStaked = _percentToGvPower(
+        uint256 stakedTotal = _percentToGvPower(
             _totalStaked[user],
             gvBalance,
             bribed
         );
-        return (gvBalance - (totalStaked + bribed));
+        return (gvBalance - (stakedTotal + bribed));
+    }
+
+    ///@notice Calculates total staked amount of a user
+    ///@return total gvPower staked
+    function totalStaked(address user) external view returns (uint256 total) {
+        uint256 gvBalance = balanceOf(user);
+        uint256 bribed = bribedAmount[user];
+        total = _percentToGvPower(_totalStaked[user], gvBalance, bribed);
     }
 
     /// @notice Get total ease deposited by user
