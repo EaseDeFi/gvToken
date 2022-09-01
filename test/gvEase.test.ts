@@ -983,9 +983,9 @@ describe("GvToken", function () {
     it("should withdraw from pot if withdraw amount is > available gvEASE", async function () {
       const amount = parseEther("60");
 
-      const bribedAmtBefore = await contracts.gvToken.bribedAmount(userAddress);
+      const bribedAmtBefore = await contracts.gvToken.leasedAmount(userAddress);
       await contracts.gvToken.connect(signers.user).withdrawRequest(amount);
-      const bribedAmtAfter = await contracts.gvToken.bribedAmount(userAddress);
+      const bribedAmtAfter = await contracts.gvToken.leasedAmount(userAddress);
       // as user has bribed 50gvEASE and user's gvEASE balance by this
       // time is slightly more than 101 gvEASE if we withdraw 60 gvEASE
       // we need to withdraw slightly more than 9gvEASE from bribed amount of the user
