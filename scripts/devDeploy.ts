@@ -33,7 +33,7 @@ import {
   TOKENSWAP_TRANSFER_AMT,
   GENESIS,
 } from "../constants";
-const PERCENT_MUL_FACTOR = 1000;
+const PERCENT_MULTIPLIER = 1000;
 
 async function main() {
   const canImpersonate = ["localhost", "hardhat"].includes(hre.network.name);
@@ -211,17 +211,15 @@ async function main() {
         contracts.gvToken,
         contracts.ease
       );
-      // STAKE 25% on one vault
-      const stakePercentage = PERCENT_MUL_FACTOR * 25;
-      console.log("Stake 25% in first rca-vault....");
+
+      // STAKE 25% each to rca vaults
+      const percents = [25 * PERCENT_MULTIPLIER, 75 * PERCENT_MULTIPLIER];
+      const vaults = [RCA_VAULTS.ezYvCrvIronBank, RCA_VAULTS.ezYvDAI];
+      console.log("Stake 25% in first rca-vault and 75% in second....");
       await contracts.gvToken
         .connect(signers.deployer)
-        .stake(stakePercentage, RCA_VAULTS.ezYvCrvIronBank);
-      // STAKE 25% on another vault
-      console.log("Stake 25% in second rca-vault....");
-      await contracts.gvToken
-        .connect(signers.deployer)
-        .stake(stakePercentage, RCA_VAULTS.ezYvDAI);
+        .adjustStakes(vaults, percents);
+
       // put 50% up for bribe
       console.log("Deposit gvEASE to bribe pot....");
       await contracts.gvToken
