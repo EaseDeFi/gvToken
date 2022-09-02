@@ -99,6 +99,7 @@ describe("GvToken", function () {
           RCA_CONTROLLER,
           tokenSwapAddress,
           GENESIS,
+          TIME_IN_SECS.day * 7,
         ],
         { kind: "uups" }
       )

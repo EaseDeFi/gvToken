@@ -137,6 +137,7 @@ async function main() {
         RCA_CONTROLLER,
         tokenSwapAddress,
         GENESIS,
+        0,
       ],
       { kind: "uups" }
     )
