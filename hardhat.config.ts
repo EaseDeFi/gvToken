@@ -35,7 +35,6 @@ if (!forking) {
   throw new Error("Please set your FORKING in a .env file");
 }
 
-// TODO: Replace below accounts with pnemonic
 const accounts: string[] = [];
 function populateAccounts() {
   let i = 1;
@@ -65,7 +64,7 @@ const chainIds = {
 function getChainConfig(network: keyof typeof chainIds): NetworkUserConfig {
   const url: string = "https://" + network + ".infura.io/v3/" + infuraApiKey;
   return {
-    accounts, // TODO: Change this to pnemonic
+    accounts,
     chainId: chainIds[network],
     url,
   };

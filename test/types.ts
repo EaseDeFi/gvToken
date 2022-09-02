@@ -37,6 +37,16 @@ export type Signers = {
   gvToken: SignerWithAddress;
   otherAccounts: SignerWithAddress[];
 };
+export type Deployers = {
+  tokenSwapDeployer: SignerWithAddress;
+  easeDeployer: SignerWithAddress;
+  bribePotDeployer: SignerWithAddress;
+  gvTokenImplDeployer: SignerWithAddress;
+  gvTokenProxyDeployer: SignerWithAddress;
+  timelockDeployer: SignerWithAddress;
+  govDelegateDeployer: SignerWithAddress;
+  govDelegatorDeployer: SignerWithAddress;
+};
 
 export type MainnetAddresses = {
   armor: string;
