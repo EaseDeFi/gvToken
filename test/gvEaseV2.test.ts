@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import { RCA_CONTROLLER } from "./constants";
 import { getTimestamp } from "./utils";
 import {
+  ERC1967Proxy__factory,
   GvToken,
   GvTokenV2,
   GvTokenV2__factory,
@@ -28,18 +29,30 @@ describe("GvTokenV2", function () {
     const GvTokenFactory = <GvToken__factory>(
       await ethers.getContractFactory("GvToken")
     );
+    const ERC1977ProxyFactory = <ERC1967Proxy__factory>(
+      await ethers.getContractFactory("ERC1967Proxy")
+    );
+    // Deploy gvToken
+    // Validate GvToken Implementation for upgradability
+    await upgrades.validateImplementation(GvTokenFactory);
+
+    // Setting gvToken as implementation initially and we will
+    // update it to proxy address later
+    contracts.gvToken = await GvTokenFactory.deploy();
+    const callData = contracts.gvToken.interface.encodeFunctionData(
+      "initialize",
+      [bribePotAddress, easeAddress, RCA_CONTROLLER, tokenSwapAddress, GENESIS]
+    );
+    const proxy = await ERC1977ProxyFactory.deploy(
+      contracts.gvToken.address,
+      callData
+    );
+
+    await proxy.deployed();
+
+    // update gvToken to proxy
     contracts.gvToken = <GvToken>(
-      await upgrades.deployProxy(
-        GvTokenFactory,
-        [
-          bribePotAddress,
-          easeAddress,
-          RCA_CONTROLLER,
-          tokenSwapAddress,
-          GENESIS,
-        ],
-        { kind: "uups" }
-      )
+      await ethers.getContractAt("GvToken", proxy.address)
     );
   });
   it("should deploy the contract", async function () {
@@ -55,15 +68,24 @@ describe("GvTokenV2", function () {
     ).to.be.reverted;
   });
   it("should upgrade the contract", async function () {
+    contracts.gvTokenV2 = <GvTokenV2>(
+      await ethers.getContractAt("GvTokenV2", contracts.gvToken.address)
+    );
+
+    // v1 should not have version funciton
+    await expect(contracts.gvTokenV2.version()).to.reverted;
+
     const GvTokenV2Factory = <GvTokenV2__factory>(
       await ethers.getContractFactory("GvTokenV2")
     );
-    contracts.gvTokenV2 = <GvTokenV2>(
-      await upgrades.upgradeProxy(contracts.gvToken.address, GvTokenV2Factory)
-    );
+    // Validate implementation
+    await upgrades.validateImplementation(GvTokenV2Factory);
 
-    // checking if gvToken address remains the same
-    expect(contracts.gvToken.address).to.equal(contracts.gvTokenV2.address);
+    const gvTokenV2Impl = await GvTokenV2Factory.deploy();
+    await gvTokenV2Impl.deployed();
+
+    await contracts.gvToken.upgradeTo(gvTokenV2Impl.address);
+
     // checking v2 deployment function
     expect(await contracts.gvTokenV2.version()).to.equal("V2");
 

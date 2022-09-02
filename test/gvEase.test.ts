@@ -6,6 +6,7 @@ import hre, { ethers, upgrades } from "hardhat";
 import {
   BribePot__factory,
   EaseToken__factory,
+  ERC1967Proxy__factory,
   GvToken,
   GvToken__factory,
   IERC20,
@@ -61,6 +62,9 @@ describe("GvToken", function () {
     const GvTokenFactory = <GvToken__factory>(
       await ethers.getContractFactory("GvToken")
     );
+    const ERC1977ProxyFactory = <ERC1967Proxy__factory>(
+      await ethers.getContractFactory("ERC1967Proxy")
+    );
     const BribePotFactory = <BribePot__factory>(
       await ethers.getContractFactory("BribePot")
     );
@@ -72,12 +76,12 @@ describe("GvToken", function () {
     });
     const gvTokenAddress = getContractAddress({
       from: signers.user.address,
-      nonce: userNonce + 1,
+      nonce: userNonce + 2,
     });
 
     const tokenSwapAddress = getContractAddress({
       from: signers.user.address,
-      nonce: userNonce + 2,
+      nonce: userNonce + 3,
     });
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
     contracts.ease = await EaseTokenFactory.connect(
@@ -91,18 +95,27 @@ describe("GvToken", function () {
       RCA_CONTROLLER
     );
 
+    // Deploy gvToken
+    // Validate GvToken Implementation for upgradability
+    await upgrades.validateImplementation(GvTokenFactory);
+
+    // Setting gvToken as implementation initially and we will
+    // update it to proxy address later
+    contracts.gvToken = await GvTokenFactory.deploy();
+    const callData = contracts.gvToken.interface.encodeFunctionData(
+      "initialize",
+      [bribePotAddress, easeAddress, RCA_CONTROLLER, tokenSwapAddress, GENESIS]
+    );
+    const proxy = await ERC1977ProxyFactory.deploy(
+      contracts.gvToken.address,
+      callData
+    );
+
+    await proxy.deployed();
+
+    // update gvToken to proxy
     contracts.gvToken = <GvToken>(
-      await upgrades.deployProxy(
-        GvTokenFactory,
-        [
-          bribePotAddress,
-          easeAddress,
-          RCA_CONTROLLER,
-          tokenSwapAddress,
-          GENESIS,
-        ],
-        { kind: "uups" }
-      )
+      await ethers.getContractAt("GvToken", proxy.address)
     );
 
     contracts.tokenSwap = <TokenSwap>(
