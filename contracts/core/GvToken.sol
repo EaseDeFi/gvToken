@@ -86,25 +86,16 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice total amount of ease deposited on user behalf
     mapping(address => uint256) private _totalDeposit;
     /// @notice Total percent of balance staked by user to different RCA-vaults
-    mapping(address => uint256) private _totalStaked;
-    /// @notice Percentage of gvToken stake to each RCA-vault
-    /// user => rcaVault => % of gvToken
-    mapping(address => mapping(address => uint256)) private _stakes;
 
     /* ========== EVENTS ========== */
     event Deposited(address indexed user, uint256 amount);
     event RedeemRequest(address indexed user, uint256 amount, uint256 endTime);
     event RedeemFinalize(address indexed user, uint256 amount);
-    event Stake(
-        address indexed user,
-        address indexed vault,
-        uint256 percentage
-    );
 
-    event UnStake(
+    event AdjustStakes(
         address indexed user,
-        address indexed vault,
-        uint256 percentage
+        address[] vaults,
+        uint256[] percents
     );
 
     /* ========== INITIALIZE ========== */
@@ -129,7 +120,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         rcaController = IRcaController(_rcaController);
         tokenSwap = ITokenSwap(_tokenSwap);
         genesis = uint32((_genesis / WEEK) * WEEK);
-        withdrawalDelay = 7 days;
         metadata = MetaData("Growing Vote Ease", "gvEase", 18);
     }
 
@@ -247,36 +237,23 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         emit RedeemFinalize(user, userReq.amount);
     }
 
-    /// @notice Stakes percentage of user gvToken to a RCA-vault of choice
-    /// @param balancePercent percentage of users balance to
-    /// stake to RCA-vault
-    /// @param vault RCA-vault address
-    function stake(uint256 balancePercent, address vault) external {
-        require(rcaController.activeShields(vault), "vault not active");
+    /// @notice Adjusts stakes of a user to different RCA-vaults
+    /// @param vaults Rca vaults user want's to stake
+    /// @param percents Percentages of gvTokens user wants to stake
+    /// in each RCA-vault
+    function adjustStakes(address[] memory vaults, uint256[] memory percents)
+        external
+    {
         address user = msg.sender;
-
-        uint256 totalStake = _totalStaked[user];
-        totalStake += balancePercent;
-
-        require(totalStake < MAX_PERCENT, "can't stake more than 100%");
-
-        _totalStaked[user] = totalStake;
-        _stakes[vault][user] += balancePercent;
-
-        emit Stake(user, vault, balancePercent);
-    }
-
-    /// @notice Unstakes percent share of users balance from RCA-vault
-    /// @param balancePercent percentage of users balance to
-    /// unstake from RCA-vault
-    /// @param vault RCA-vault address
-    function unStake(uint256 balancePercent, address vault) external {
-        address user = msg.sender;
-
-        _stakes[vault][user] -= balancePercent;
-        _totalStaked[user] -= balancePercent;
-
-        emit UnStake(user, vault, balancePercent);
+        uint256 length = vaults.length;
+        require(percents.length == length, "length mismatch");
+        uint256 totalPercent;
+        for (uint256 i; i < length; i++) {
+            require(rcaController.activeShields(vaults[i]), "vault not active");
+            totalPercent += percents[i];
+        }
+        require(totalPercent <= MAX_PERCENT, "can't stake more than 100%");
+        emit AdjustStakes(user, vaults, percents);
     }
 
     /// @notice Deposits gvToken of an account to bribe pot
@@ -377,7 +354,7 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     /// @param time Delay time in seconds
     function setDelay(uint256 time) external onlyOwner {
         time = (time / 1 weeks) * 1 weeks;
-        require(time > 1 weeks, "min delay 7 days");
+        require(time >= 1 weeks, "min delay 7 days");
         withdrawalDelay = time;
     }
 
@@ -412,45 +389,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice EIP-20 token decimals for this token
     function decimals() external view returns (uint8) {
         return uint8(metadata.decimals);
-    }
-
-    /// @notice Calculates amount of gvToken staked by user to rca-vault
-    /// @param user Address of the staker
-    /// @param vault Address of rca-vault
-    /// @return Amount of gvToken staked
-    function powerStaked(address user, address vault)
-        external
-        view
-        returns (uint256)
-    {
-        uint256 gvBalance = balanceOf(user);
-        uint256 leased = leasedAmount[user];
-        return _percentToGvPower(_stakes[vault][user], gvBalance, leased);
-    }
-
-    ///@notice Calcualtes amount of gvToken that is available for stake
-    ///@return Amount of gvToken that is available for staking or bribing
-    function powerAvailableForStake(address user)
-        external
-        view
-        returns (uint256)
-    {
-        uint256 gvBalance = balanceOf(user);
-        uint256 leased = leasedAmount[user];
-        uint256 stakedTotal = _percentToGvPower(
-            _totalStaked[user],
-            gvBalance,
-            leased
-        );
-        return (gvBalance - (stakedTotal + leased));
-    }
-
-    ///@notice Calculates total staked amount of a user
-    ///@return total gvPower staked
-    function totalStaked(address user) external view returns (uint256 total) {
-        uint256 gvBalance = balanceOf(user);
-        uint256 bribed = leasedAmount[user];
-        total = _percentToGvPower(_totalStaked[user], gvBalance, bribed);
     }
 
     /// @notice Get total ease deposited by user

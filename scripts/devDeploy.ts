@@ -17,6 +17,7 @@ import {
   GovernorBravoDelegate__factory,
   GovernorBravoDelegator__factory,
   Timelock__factory,
+  ERC1967Proxy__factory,
 } from "../src/types";
 import {
   MAINNET_ADDRESSES,
@@ -33,7 +34,7 @@ import {
   TOKENSWAP_TRANSFER_AMT,
   GENESIS,
 } from "../constants";
-const PERCENT_MUL_FACTOR = 1000;
+const PERCENT_MULTIPLIER = 1000;
 
 async function main() {
   const canImpersonate = ["localhost", "hardhat"].includes(hre.network.name);
@@ -52,6 +53,11 @@ async function main() {
   const GvTokenFactory = <GvToken__factory>(
     await ethers.getContractFactory("GvToken")
   );
+
+  const ERC1977ProxyFactory = <ERC1967Proxy__factory>(
+    await ethers.getContractFactory("ERC1967Proxy")
+  );
+
   const BribePotFactory = <BribePot__factory>(
     await ethers.getContractFactory("BribePot")
   );
@@ -135,25 +141,36 @@ async function main() {
   console.log(`Bribe Pot deployed at ${contracts.bribePot.address}`);
 
   // Deploy gvToken
-  contracts.gvToken = <GvToken>(
-    await upgrades.deployProxy(
-      GvTokenFactory,
-      [
-        bribePotAddress,
-        easeTokenAddress,
-        RCA_CONTROLLER,
-        tokenSwapAddress,
-        GENESIS,
-      ],
-      { kind: "uups" }
-    )
-  );
-  await contracts.gvToken.deployed();
-  console.log(`Gv Token deployed at ${contracts.gvToken.address}`);
+  await upgrades.validateImplementation(GvTokenFactory);
 
-  // Fund tokenswap with ease token
+  // Setting gvToken as implementation initially and we will
+  // update it to proxy address later
+  contracts.gvToken = await GvTokenFactory.deploy();
   await contracts.gvToken.deployed();
-  console.log(`Gv Token deployed at ${contracts.gvToken.address}`);
+
+  const callData = contracts.gvToken.interface.encodeFunctionData(
+    "initialize",
+    [
+      bribePotAddress,
+      easeTokenAddress,
+      RCA_CONTROLLER,
+      tokenSwapAddress,
+      GENESIS,
+    ]
+  );
+
+  const proxy = await ERC1977ProxyFactory.deploy(
+    contracts.gvToken.address,
+    callData
+  );
+  await proxy.deployed();
+
+  // update gvToken to proxy
+  contracts.gvToken = <GvToken>(
+    await ethers.getContractAt("GvToken", proxy.address)
+  );
+
+  console.log(`Gv Token deployed to: ${contracts.gvToken.address}`);
 
   contracts.timelock = await TimelockFactory.deploy(
     govAddress,
@@ -211,17 +228,15 @@ async function main() {
         contracts.gvToken,
         contracts.ease
       );
-      // STAKE 25% on one vault
-      const stakePercentage = PERCENT_MUL_FACTOR * 25;
-      console.log("Stake 25% in first rca-vault....");
+
+      // STAKE 25% each to rca vaults
+      const percents = [25 * PERCENT_MULTIPLIER, 75 * PERCENT_MULTIPLIER];
+      const vaults = [RCA_VAULTS.ezYvCrvIronBank, RCA_VAULTS.ezYvDAI];
+      console.log("Stake 25% in first rca-vault and 75% in second....");
       await contracts.gvToken
         .connect(signers.deployer)
-        .stake(stakePercentage, RCA_VAULTS.ezYvCrvIronBank);
-      // STAKE 25% on another vault
-      console.log("Stake 25% in second rca-vault....");
-      await contracts.gvToken
-        .connect(signers.deployer)
-        .stake(stakePercentage, RCA_VAULTS.ezYvDAI);
+        .adjustStakes(vaults, percents);
+
       // put 50% up for bribe
       console.log("Deposit gvEASE to bribe pot....");
       await contracts.gvToken

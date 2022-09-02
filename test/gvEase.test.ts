@@ -6,6 +6,7 @@ import hre, { ethers, upgrades } from "hardhat";
 import {
   BribePot__factory,
   EaseToken__factory,
+  ERC1967Proxy__factory,
   GvToken,
   GvToken__factory,
   IERC20,
@@ -13,12 +14,18 @@ import {
   TokenSwap,
   TokenSwap__factory,
 } from "../src/types";
-import { MAINNET_ADDRESSES, RCA_CONTROLLER, RCA_VAULT } from "./constants";
+import {
+  BUFFER,
+  MAINNET_ADDRESSES,
+  RCA_CONTROLLER,
+  RCA_VAULT,
+  RCA_VAULT_1,
+} from "./constants";
 import { getPermitSignature } from "./helpers";
 import BalanceTree from "./helpers/balance-tree";
 import { Contracts, Signers } from "./types";
 import { fastForward, getTimestamp, mine, TIME_IN_SECS } from "./utils";
-const MAX_PERCENT = 100_000;
+const PERCENT_MULTIPLIER = 1000;
 
 describe("GvToken", function () {
   const contracts = {} as Contracts;
@@ -55,6 +62,9 @@ describe("GvToken", function () {
     const GvTokenFactory = <GvToken__factory>(
       await ethers.getContractFactory("GvToken")
     );
+    const ERC1977ProxyFactory = <ERC1967Proxy__factory>(
+      await ethers.getContractFactory("ERC1967Proxy")
+    );
     const BribePotFactory = <BribePot__factory>(
       await ethers.getContractFactory("BribePot")
     );
@@ -66,12 +76,12 @@ describe("GvToken", function () {
     });
     const gvTokenAddress = getContractAddress({
       from: signers.user.address,
-      nonce: userNonce + 1,
+      nonce: userNonce + 2,
     });
 
     const tokenSwapAddress = getContractAddress({
       from: signers.user.address,
-      nonce: userNonce + 2,
+      nonce: userNonce + 3,
     });
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
     contracts.ease = await EaseTokenFactory.connect(
@@ -85,18 +95,27 @@ describe("GvToken", function () {
       RCA_CONTROLLER
     );
 
+    // Deploy gvToken
+    // Validate GvToken Implementation for upgradability
+    await upgrades.validateImplementation(GvTokenFactory);
+
+    // Setting gvToken as implementation initially and we will
+    // update it to proxy address later
+    contracts.gvToken = await GvTokenFactory.deploy();
+    const callData = contracts.gvToken.interface.encodeFunctionData(
+      "initialize",
+      [bribePotAddress, easeAddress, RCA_CONTROLLER, tokenSwapAddress, GENESIS]
+    );
+    const proxy = await ERC1977ProxyFactory.deploy(
+      contracts.gvToken.address,
+      callData
+    );
+
+    await proxy.deployed();
+
+    // update gvToken to proxy
     contracts.gvToken = <GvToken>(
-      await upgrades.deployProxy(
-        GvTokenFactory,
-        [
-          bribePotAddress,
-          easeAddress,
-          RCA_CONTROLLER,
-          tokenSwapAddress,
-          GENESIS,
-        ],
-        { kind: "uups" }
-      )
+      await ethers.getContractAt("GvToken", proxy.address)
     );
 
     contracts.tokenSwap = <TokenSwap>(
@@ -123,6 +142,8 @@ describe("GvToken", function () {
       await ethers.getContractAt("IERC20", MAINNET_ADDRESSES.armor)
     );
 
+    // set delay to 1 week
+    await contracts.gvToken.setDelay(TIME_IN_SECS.day * 7);
     // Fund whale's wallet with eth
     await signers.user.sendTransaction({
       to: vArmorWhale.address,
@@ -316,7 +337,7 @@ describe("GvToken", function () {
       // total ease deposit
       expect(await contracts.gvToken.totalDeposited()).to.equal(value.mul(2));
     });
-    it("should deposit multiple times and allow user to bribe,stake,and withdraw ", async function () {
+    it("should deposit multiple times and allow user to lease, and withdraw ", async function () {
       const value = parseEther("10");
       let deadline = (await getTimestamp()).add(1000);
       const initialDepositCount = 50;
@@ -341,11 +362,6 @@ describe("GvToken", function () {
         await fastForward(TIME_IN_SECS.month);
         await mine();
       }
-      const balPercent = BigNumber.from(10_000);
-
-      await contracts.gvToken
-        .connect(signers.user)
-        .stake(balPercent, RCA_VAULT);
 
       await contracts.gvToken
         .connect(signers.user)
@@ -439,7 +455,10 @@ describe("GvToken", function () {
         userValue = parseEther("800");
         // using userDeposit start before genesis to revert when called deposit
         // using this proof
-        vArmorHolderValue = await contracts.vArmor.vArmorToArmor(vArmorAmount);
+        vArmorHolderValue = (await contracts.tokenSwap.exchangeRate())
+          .mul(vArmorAmount)
+          .div(BUFFER);
+
         userDepositStart = BigNumber.from(
           (await contracts.gvToken.genesis()) - 1000
         );
@@ -691,266 +710,44 @@ describe("GvToken", function () {
       });
     });
   });
-
-  describe("stake()", function () {
-    const stkPercent = BigNumber.from(10000);
-    beforeEach(async function () {
-      // deposit
+  describe("adjustStakes()", function () {
+    before(async function () {
       const value = parseEther("100");
-      // deposit bob
       await depositFor(signers.bob, value);
-      // deposit user
-      await depositFor(signers.user, value);
-
-      // deposit to pot
-      // add 50 gvEase from user to bribe pot
-      await contracts.gvToken
-        .connect(signers.user)
-        .depositToPot(value.mul(5).div(10));
-      // add 100 gvEase from bob to bribe pot
-      await contracts.gvToken.connect(signers.bob).depositToPot(value);
-
-      // add bribe to bribe pot
-      const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = RCA_VAULT;
-      const numOfWeeks = 2;
-      const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
-      const spender = contracts.bribePot.address;
-      const deadline = (await getTimestamp()).add(1000);
-      const { v, r, s } = await getPermitSignature({
-        signer: signers.briber,
-        token: contracts.ease,
-        value: totalBribeAmt,
-        deadline,
-        spender,
-      });
-      // add bribe amount to pot
-      await contracts.bribePot
-        .connect(signers.briber)
-        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
-          deadline,
-          v,
-          r,
-          s,
-        });
-      // forward beyond 2nd week
-      const genesis = await contracts.bribePot.genesis();
-      const timeNeededToReachWeek1 = genesis
-        .add(TIME_IN_SECS.week)
-        .sub(await getTimestamp());
-      // move beyond week2
-      await fastForward(
-        timeNeededToReachWeek1.add(TIME_IN_SECS.week).toNumber()
-      );
-      await mine();
+      await depositFor(signers.alice, value);
     });
-    it("should return the exact staked gvEASE amount", async function () {
-      // deposit 100 $EASE for alice
-      const signerA = signers.otherAccounts[0];
-      const signerB = signers.otherAccounts[1];
-      const amount = parseEther("100");
-
-      // Fund signers with ease balance
-      await contracts.ease
-        .connect(signers.easeDeployer)
-        .transfer(signerA.address, amount);
-      await contracts.ease
-        .connect(signers.easeDeployer)
-        .transfer(signerB.address, amount);
-
-      // deposit for A
-      await depositFor(signerA, amount);
-      // deposit for B
-      await depositFor(signerB, amount);
-
-      const fiftyPercent = BigNumber.from(50000);
-      //user A stakes 50% to rca vault
-      await contracts.gvToken.connect(signerA).stake(fiftyPercent, RCA_VAULT);
-
-      //user B stakes 50% to rca vault
-      await contracts.gvToken.connect(signerB).stake(fiftyPercent, RCA_VAULT);
-
-      // User B leases 50 $gvEase to bribe pot
-      const leaseAmount = parseEther("50");
-      await contracts.gvToken.connect(signerB).depositToPot(leaseAmount);
-      let expectedStakeAmountOfA = parseEther("50");
-      let totalStakedA = await contracts.gvToken.totalStaked(signerA.address);
-      expect(totalStakedA).to.gte(expectedStakeAmountOfA);
-
-      // the reason staked amount for signerB becomes 25 $gvEASE is because
-      // 50 $gvEASE has been leased and total $gvEASE that can be staked is
-      // 50 $gvEASE at current time so 50% of 50 $gvEASE = 25 $gvEASE
-      let expectedStakeAmountOfB = parseEther("25");
-      let totalStakedB = await contracts.gvToken.totalStaked(signerB.address);
-      expect(totalStakedB).to.gte(expectedStakeAmountOfB);
-
-      // Wait for 6 months
-      await fastForward(TIME_IN_SECS.year / 2);
-      await mine();
-
-      expectedStakeAmountOfA = parseEther("75");
-      totalStakedA = await contracts.gvToken.totalStaked(signerA.address);
-      expect(totalStakedA).to.gte(expectedStakeAmountOfA);
-
-      // the reason staked amount for signerB becomes 50 $gvEASE is because
-      // 50 $gvEASE has been leased and total $gvEASE that can be staked is
-      // 100 $gvEASE at current time so 50% of 100 $gvEASE = 50 $gvEASE
-      expectedStakeAmountOfB = parseEther("50");
-      totalStakedB = await contracts.gvToken.totalStaked(signerB.address);
-      expect(totalStakedB).to.gte(expectedStakeAmountOfB);
-    });
-    it("should emit Stake event on successful stake", async function () {
-      // stake to a vault
-      expect(
-        await contracts.gvToken
-          .connect(signers.user)
-          .stake(stkPercent, RCA_VAULT)
-      )
-        .to.emit(contracts.gvToken, "Stake")
-        .withArgs(userAddress, RCA_VAULT, stkPercent);
-    });
-    it("should fail if staking % is more than 100%", async function () {
-      // this should revert
+    it("should allow user to stake to multiple RCA-vaults", async function () {
+      const percents = [10 * PERCENT_MULTIPLIER, 90 * PERCENT_MULTIPLIER];
+      const vaults = [RCA_VAULT, RCA_VAULT_1];
       await expect(
-        contracts.gvToken
-          .connect(signers.user)
-          .stake(stkPercent.mul(11), RCA_VAULT)
+        contracts.gvToken.connect(signers.bob).adjustStakes(vaults, percents)
+      )
+        .to.emit(contracts.gvToken, "AdjustStakes")
+        .withArgs(bobAddress, vaults, percents);
+    });
+    it("should not allow users to adjust stakes with different length of stakes and percents", async function () {
+      const percents = [10 * PERCENT_MULTIPLIER, 90 * PERCENT_MULTIPLIER];
+      const vaults = [RCA_VAULT, RCA_VAULT_1, ethers.constants.AddressZero];
+      await expect(
+        contracts.gvToken.connect(signers.bob).adjustStakes(vaults, percents)
+      ).to.revertedWith("length mismatch");
+    });
+    it("should not allow users to stake more than 100%", async function () {
+      const percents = [50 * PERCENT_MULTIPLIER, 90 * PERCENT_MULTIPLIER];
+      const vaults = [RCA_VAULT, RCA_VAULT_1];
+      await expect(
+        contracts.gvToken.connect(signers.bob).adjustStakes(vaults, percents)
       ).to.revertedWith("can't stake more than 100%");
     });
-    it("should revert if inactive vault is passed", async function () {
-      const inactiveVault = signers.otherAccounts[0].address;
+    it("should not allow user's to pass inactive vault", async function () {
+      const percents = [10 * PERCENT_MULTIPLIER, 90 * PERCENT_MULTIPLIER];
+      const vaults = [RCA_VAULT, ethers.constants.AddressZero];
       await expect(
-        contracts.gvToken.connect(signers.user).stake(stkPercent, inactiveVault)
+        contracts.gvToken.connect(signers.bob).adjustStakes(vaults, percents)
       ).to.revertedWith("vault not active");
     });
   });
-  describe("unstake()", function () {
-    const stkPercent = BigNumber.from(10000);
-    const value = parseEther("100");
-    const userBribedAmt = value.mul(5).div(10);
-    beforeEach(async function () {
-      // deposit
-      // deposit bob
-      await depositFor(signers.bob, value);
 
-      // deposit user
-      await depositFor(signers.user, value);
-
-      // stake to a vault
-      await contracts.gvToken
-        .connect(signers.user)
-        .stake(stkPercent, RCA_VAULT);
-
-      // deposit to pot
-      // add 50 gvEase from user to bribe pot
-      await contracts.gvToken.connect(signers.user).depositToPot(userBribedAmt);
-      // add 100 gvEase from bob to bribe pot
-      await contracts.gvToken.connect(signers.bob).depositToPot(value);
-
-      // add bribe to bribe pot
-      const bribePerWeek = parseEther("10");
-      const rcaVaultAddress = RCA_VAULT;
-      const numOfWeeks = 2;
-      const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
-      const spender = contracts.bribePot.address;
-      const deadline = (await getTimestamp()).add(1000);
-      const { v, r, s } = await getPermitSignature({
-        signer: signers.briber,
-        token: contracts.ease,
-        value: totalBribeAmt,
-        deadline,
-        spender,
-      });
-      // add bribe amount to pot
-      await contracts.bribePot
-        .connect(signers.briber)
-        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
-          deadline,
-          v,
-          r,
-          s,
-        });
-
-      // forward beyond 2nd week
-      const genesis = await contracts.bribePot.genesis();
-      const timeNeededToReachWeek1 = genesis
-        .add(TIME_IN_SECS.week)
-        .sub(await getTimestamp());
-      // move beyond week2
-      await fastForward(
-        timeNeededToReachWeek1.add(TIME_IN_SECS.week).toNumber()
-      );
-      await mine();
-    });
-    it("should emit UnStake event", async function () {
-      // call unstake to emit
-      expect(
-        await contracts.gvToken
-          .connect(signers.user)
-          .unStake(stkPercent, RCA_VAULT)
-      )
-        .to.emit(contracts.gvToken, "UnStake")
-        .withArgs(userAddress, RCA_VAULT, stkPercent);
-    });
-    it("should revert if user is trying to withdraw from inactive vault", async function () {
-      // call unstake to a different vault
-      const inactiveVault = signers.user.address;
-      await expect(
-        contracts.gvToken
-          .connect(signers.user)
-          .unStake(stkPercent, inactiveVault)
-      ).to.reverted;
-    });
-    describe("powerStaked()", function () {
-      it("should update the powerStaked of a user", async function () {
-        const powerStakedBefore = await contracts.gvToken.powerStaked(
-          userAddress,
-          RCA_VAULT
-        );
-
-        await contracts.gvToken
-          .connect(signers.user)
-          .unStake(stkPercent, RCA_VAULT);
-        const powerStakedAfter = await contracts.gvToken.powerStaked(
-          userAddress,
-          RCA_VAULT
-        );
-        // this sould come out as 5gvEASE
-        const expectedPowerStakedIncrease = stkPercent
-          .mul(value.sub(userBribedAmt))
-          .div(MAX_PERCENT);
-
-        // as we have bribed 50gvEase of a user to bribePot and we have
-        // forwarded time by a week, user's actual gvEASE balance at this
-        // time is slightly more than 101 gvEASE. So staking 10% to some RCA_VAULT
-        // here means staking 10% of (101 - 50)gvEASE which equals to 5.1 gvEASE
-        // so we are expecting stakedPower difference to be more than 5gvEASe
-        expect(powerStakedBefore.sub(powerStakedAfter)).to.gt(
-          expectedPowerStakedIncrease
-        );
-
-        // as we are unstaking everything form the vault powerStakedAfter should
-        // be zero
-        expect(powerStakedAfter).to.equal(0);
-      });
-    });
-    describe("powerAvailableForStake()", function () {
-      it("should return correct power available for stake", async function () {
-        const userBalance = await contracts.gvToken.balanceOf(userAddress);
-        const stakedToRcaVault = await contracts.gvToken.powerStaked(
-          userAddress,
-          RCA_VAULT
-        );
-        const expectedPowerAvailableForStake = userBalance
-          .sub(userBribedAmt)
-          .sub(stakedToRcaVault);
-        const powerAvailableForStake =
-          await contracts.gvToken.powerAvailableForStake(userAddress);
-
-        expect(powerAvailableForStake).to.equal(expectedPowerAvailableForStake);
-      });
-    });
-  });
   describe("withdrawRequest()", function () {
     const userBribeAmount = parseEther("50");
     this.beforeEach(async function () {

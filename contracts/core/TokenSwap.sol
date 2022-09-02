@@ -1,6 +1,7 @@
 /// SPDX-License-Identifier: UNLICENSED
 
 pragma solidity 0.8.11;
+import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../interfaces/IEaseToken.sol";
@@ -8,10 +9,12 @@ import "../interfaces/IVArmor.sol";
 
 contract TokenSwap {
     address private constant DEAD = address(0xdEaD);
+    uint256 private constant BUFFER = 1e18;
     IEaseToken public immutable ease;
     IERC20 public immutable armor;
     IVArmor public immutable vArmor;
     string public name = "Ease Token Swap";
+    uint256 public immutable exchangeRate = 1176860757679165373;
 
     constructor(
         address ease_,
@@ -45,7 +48,7 @@ contract TokenSwap {
     }
 
     function _swapVArmor(address user, uint256 amount) internal {
-        uint256 armorAmount = vArmor.vArmorToArmor(amount);
+        uint256 armorAmount = (amount * exchangeRate) / BUFFER;
         ease.transfer(user, armorAmount);
         vArmor.transferFrom(user, DEAD, amount);
     }

@@ -5,6 +5,7 @@ import { BigNumber } from "ethers";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat";
 import {
+  ERC1967Proxy__factory,
   GovernorBravoDelegate__factory,
   GovernorBravoDelegator__factory,
   GvToken,
@@ -65,6 +66,9 @@ describe("EaseGovernance", function () {
     const GvTokenFactory = <GvToken__factory>(
       await ethers.getContractFactory("GvToken")
     );
+    const ERC1977ProxyFactory = <ERC1967Proxy__factory>(
+      await ethers.getContractFactory("ERC1967Proxy")
+    );
     const BribePotFactory = <BribePot__factory>(
       await ethers.getContractFactory("BribePot")
     );
@@ -81,16 +85,16 @@ describe("EaseGovernance", function () {
     const deployerNonce = await signers.deployer.getTransactionCount();
     const gvTokenAddress = getContractAddress({
       from: signers.deployer.address,
-      nonce: deployerNonce,
+      nonce: deployerNonce + 1,
     });
     const bribePotAddress = getContractAddress({
       from: signers.deployer.address,
-      nonce: deployerNonce + 1,
+      nonce: deployerNonce + 2,
     });
 
     const govAddress = getContractAddress({
       from: signers.deployer.address,
-      nonce: deployerNonce + 4,
+      nonce: deployerNonce + 5,
     });
 
     const GENESIS = (await getTimestamp()).sub(TIME_IN_SECS.year);
@@ -100,19 +104,27 @@ describe("EaseGovernance", function () {
     const easeAddress = contracts.ease.address;
     // As we will not call depositWithVarmor or depositWithArmor
     const tokenSwapAddress = easeAddress;
-    // 1st transaction
+    // Deploy gvToken
+    // Validate GvToken Implementation for upgradability
+    await upgrades.validateImplementation(GvTokenFactory);
+
+    // Setting gvToken as implementation initially and we will
+    // update it to proxy address later
+    contracts.gvToken = await GvTokenFactory.deploy();
+    const callData = contracts.gvToken.interface.encodeFunctionData(
+      "initialize",
+      [bribePotAddress, easeAddress, RCA_CONTROLLER, tokenSwapAddress, GENESIS]
+    );
+    const proxy = await ERC1977ProxyFactory.deploy(
+      contracts.gvToken.address,
+      callData
+    );
+
+    await proxy.deployed();
+
+    // update gvToken to proxy
     contracts.gvToken = <GvToken>(
-      await upgrades.deployProxy(
-        GvTokenFactory,
-        [
-          bribePotAddress,
-          easeAddress,
-          RCA_CONTROLLER,
-          tokenSwapAddress,
-          GENESIS,
-        ],
-        { kind: "uups" }
-      )
+      await ethers.getContractAt("GvToken", proxy.address)
     );
 
     // 2nd transaction
@@ -403,9 +415,7 @@ describe("EaseGovernance", function () {
       await fastForward(TIME_IN_SECS.day * 2);
       await mine();
       // withdrawal delay should be 1 week
-      expect(await contracts.gvToken.withdrawalDelay()).to.equal(
-        TIME_IN_SECS.week
-      );
+      expect(await contracts.gvToken.withdrawalDelay()).to.equal(0);
       // execute transaction
       expect(await contracts.easeGovernance.execute(proposalId))
         .to.emit(contracts.easeGovernance, "ProposalExecuted")

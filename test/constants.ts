@@ -1,5 +1,6 @@
+import { BigNumber } from "ethers";
 import { MainnetAddresses } from "./types";
-
+export const BUFFER = BigNumber.from(10).pow(18);
 export const MAINNET_ADDRESSES: MainnetAddresses = {
   armor: "0x1337DEF16F9B486fAEd0293eb623Dc8395dFE46a",
   armorWhale: "0x66F6d639199342619CAF8617bf80eA738e5960A3",
@@ -9,6 +10,7 @@ export const MAINNET_ADDRESSES: MainnetAddresses = {
 
 export const RCA_CONTROLLER = "0xEA5edEF1A7106D9e2024240299DF3D00C7D94767";
 export const RCA_VAULT = "0xEa5eDEF185427F1691C86eD2cF0742BBD35f9ecc";
+export const RCA_VAULT_1 = "0xeA5eDEF17bdE66fA56Ea6EaC135ef83391D7e742";
 export const RCA_VAULTS = {
   ezYvWETH: "0xeA5Edef1983B46F04696aB545473719F308b106f",
   ezYvUSDC: "0xea5eDeF155b0663BB7Cad73Df0BC06e24D9DdbDA",
