@@ -110,7 +110,6 @@ describe("EaseGovernance", function () {
           RCA_CONTROLLER,
           tokenSwapAddress,
           GENESIS,
-          TIME_IN_SECS.day * 7,
         ],
         { kind: "uups" }
       )
@@ -404,9 +403,7 @@ describe("EaseGovernance", function () {
       await fastForward(TIME_IN_SECS.day * 2);
       await mine();
       // withdrawal delay should be 1 week
-      expect(await contracts.gvToken.withdrawalDelay()).to.equal(
-        TIME_IN_SECS.week
-      );
+      expect(await contracts.gvToken.withdrawalDelay()).to.equal(0);
       // execute transaction
       expect(await contracts.easeGovernance.execute(proposalId))
         .to.emit(contracts.easeGovernance, "ProposalExecuted")

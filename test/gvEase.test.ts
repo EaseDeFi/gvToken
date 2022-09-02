@@ -14,6 +14,7 @@ import {
   TokenSwap__factory,
 } from "../src/types";
 import {
+  BUFFER,
   MAINNET_ADDRESSES,
   RCA_CONTROLLER,
   RCA_VAULT,
@@ -99,7 +100,6 @@ describe("GvToken", function () {
           RCA_CONTROLLER,
           tokenSwapAddress,
           GENESIS,
-          TIME_IN_SECS.day * 7,
         ],
         { kind: "uups" }
       )
@@ -129,6 +129,8 @@ describe("GvToken", function () {
       await ethers.getContractAt("IERC20", MAINNET_ADDRESSES.armor)
     );
 
+    // set delay to 1 week
+    await contracts.gvToken.setDelay(TIME_IN_SECS.day * 7);
     // Fund whale's wallet with eth
     await signers.user.sendTransaction({
       to: vArmorWhale.address,
@@ -440,7 +442,10 @@ describe("GvToken", function () {
         userValue = parseEther("800");
         // using userDeposit start before genesis to revert when called deposit
         // using this proof
-        vArmorHolderValue = await contracts.vArmor.vArmorToArmor(vArmorAmount);
+        vArmorHolderValue = (await contracts.tokenSwap.exchangeRate())
+          .mul(vArmorAmount)
+          .div(BUFFER);
+
         userDepositStart = BigNumber.from(
           (await contracts.gvToken.genesis()) - 1000
         );

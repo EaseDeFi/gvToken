@@ -1,7 +1,7 @@
 import { Contracts, Signers } from "./types";
 import { ethers, upgrades } from "hardhat";
 import { RCA_CONTROLLER } from "./constants";
-import { getTimestamp, TIME_IN_SECS } from "./utils";
+import { getTimestamp } from "./utils";
 import {
   GvToken,
   GvTokenV2,
@@ -37,7 +37,6 @@ describe("GvTokenV2", function () {
           RCA_CONTROLLER,
           tokenSwapAddress,
           GENESIS,
-          TIME_IN_SECS.day * 7,
         ],
         { kind: "uups" }
       )
@@ -52,7 +51,7 @@ describe("GvTokenV2", function () {
   it("should initialize the contract", async function () {
     const addrZero = bribePotAddress;
     await expect(
-      contracts.gvToken.initialize(addrZero, addrZero, addrZero, addrZero, 1, 0)
+      contracts.gvToken.initialize(addrZero, addrZero, addrZero, addrZero, 1)
     ).to.be.reverted;
   });
   it("should upgrade the contract", async function () {

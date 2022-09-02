@@ -1,5 +1,6 @@
+import { BigNumber } from "ethers";
 import { MainnetAddresses } from "./types";
-
+export const BUFFER = BigNumber.from(10).pow(18);
 export const MAINNET_ADDRESSES: MainnetAddresses = {
   armor: "0x1337DEF16F9B486fAEd0293eb623Dc8395dFE46a",
   armorWhale: "0x66F6d639199342619CAF8617bf80eA738e5960A3",

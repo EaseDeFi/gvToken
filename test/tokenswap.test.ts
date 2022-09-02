@@ -8,7 +8,7 @@ import type {
   IERC20,
   IVArmor,
 } from "../src/types";
-import { MAINNET_ADDRESSES } from "./constants";
+import { BUFFER, MAINNET_ADDRESSES } from "./constants";
 import { resetBlockchain } from "./utils";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { expect } from "chai";
@@ -153,7 +153,9 @@ describe("TokenSwap", function () {
       await contracts.vArmor
         .connect(signers.user)
         .approve(contracts.tokenSwap.address, amount);
-      const easeTokensToMint = await contracts.vArmor.vArmorToArmor(amount);
+      const easeTokensToMint = (await contracts.tokenSwap.exchangeRate())
+        .mul(amount)
+        .div(BUFFER);
       const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
       await contracts.tokenSwap.connect(signers.user).swapVArmor(amount);
       const userEaseBalAfter = await contracts.ease.balanceOf(userAddress);
@@ -179,7 +181,9 @@ describe("TokenSwap", function () {
         .connect(signers.user)
         .approve(contracts.tokenSwap.address, amount);
       // amount of ease the user will recieve
-      const easeTokensToMint = await contracts.vArmor.vArmorToArmor(amount);
+      const easeTokensToMint = (await contracts.tokenSwap.exchangeRate())
+        .mul(amount)
+        .div(BUFFER);
 
       const userEaseBalBefore = await contracts.ease.balanceOf(userAddress);
       // swap vArmor on behalf or a user

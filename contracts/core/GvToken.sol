@@ -107,14 +107,12 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     /// active rca vaults.
     /// @param _tokenSwap VArmor to EASE token swap address
     /// @param _genesis Deposit time of first vArmor holder.
-    /// @param _withdrawalDelay Time delay for withdrawals
     function initialize(
         address _pot,
         address _stakingToken,
         address _rcaController,
         address _tokenSwap,
-        uint256 _genesis,
-        uint256 _withdrawalDelay
+        uint256 _genesis
     ) external initializer {
         __Ownable_init();
         pot = IBribePot(_pot);
@@ -122,7 +120,6 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         rcaController = IRcaController(_rcaController);
         tokenSwap = ITokenSwap(_tokenSwap);
         genesis = uint32((_genesis / WEEK) * WEEK);
-        withdrawalDelay = _withdrawalDelay;
         metadata = MetaData("Growing Vote Ease", "gvEase", 18);
     }
 
@@ -357,7 +354,7 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     /// @param time Delay time in seconds
     function setDelay(uint256 time) external onlyOwner {
         time = (time / 1 weeks) * 1 weeks;
-        require(time > 1 weeks, "min delay 7 days");
+        require(time >= 1 weeks, "min delay 7 days");
         withdrawalDelay = time;
     }
 
