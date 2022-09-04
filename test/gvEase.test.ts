@@ -1177,6 +1177,81 @@ describe("GvToken", function () {
       // as the delegates vote was not updated vote diff should be 0
       expect(votesDifference).to.equal(0);
     });
+    it("should automatically update delegated votes on multiple deposit", async function () {
+      const amount = parseEther("100");
+
+      let deadline = (await getTimestamp()).add(1000);
+      const spender = contracts.gvToken.address;
+      let { v, r, s } = await getPermitSignature({
+        signer: signers.bob,
+        token: contracts.ease,
+        value: amount,
+        deadline,
+        spender,
+      });
+      await expect(
+        contracts.gvToken
+          .connect(signers.bob)
+          ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](amount, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.not.emit(contracts.gvToken, "DelegateVotesChanged");
+
+      // delegate
+      await contracts.gvToken.connect(signers.bob).delegate(aliceAddress);
+
+      let bobBalance = await contracts.gvToken.balanceOf(bobAddress);
+
+      let numCheckpoints = await contracts.gvToken.numCheckpoints(aliceAddress);
+
+      // alice last checkpoint
+      let lastAliceCheckpoint = await contracts.gvToken.checkpoints(
+        aliceAddress,
+        numCheckpoints - 1
+      );
+      // bob current balance should be equal to delegated votes
+      expect(lastAliceCheckpoint.votes).to.equal(bobBalance);
+
+      // forward time for 6 months
+      await fastForward(TIME_IN_SECS.year / 2);
+      await mine();
+
+      // deposit again
+      deadline = (await getTimestamp()).add(1000);
+      ({ v, r, s } = await getPermitSignature({
+        signer: signers.bob,
+        token: contracts.ease,
+        value: amount,
+        deadline,
+        spender,
+      }));
+      bobBalance = await contracts.gvToken.balanceOf(bobAddress);
+      await expect(
+        contracts.gvToken
+          .connect(signers.bob)
+          ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](amount, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.emit(contracts.gvToken, "DelegateVotesChanged");
+
+      bobBalance = await contracts.gvToken.balanceOf(bobAddress);
+
+      numCheckpoints = await contracts.gvToken.numCheckpoints(aliceAddress);
+
+      // bob last checkpoint
+      lastAliceCheckpoint = await contracts.gvToken.checkpoints(
+        aliceAddress,
+        numCheckpoints - 1
+      );
+      // bob current vote should be equal to delegated votes
+      expect(lastAliceCheckpoint.votes).to.equal(bobBalance);
+    });
   });
   describe("totalSupply()", function () {
     it("should update totalSupply on deposit", async function () {

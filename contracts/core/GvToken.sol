@@ -455,6 +455,21 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
 
         _updateBalances(user, amount, depositStart);
 
+        // update delegates if the depositor has already delegated
+        // his votes. This _delegate call will delegate vote grown
+        // part too.
+        // Example: Let's say user is depositing 100 $EASE on
+        // this deposit call. The user has deposited 100 $EASE 6 months
+        // before and delegated votes to bob. At current time the total
+        // votes delegated by user to bob is 100 $gvEASE but the users
+        // balance after updating balance now is 150 $gvEASE + 100 $gvEASE
+        // => 250 gvEASE so the below delegate function call will update
+        // the delegated amount for the grown part too. Meaning total delegated
+        // by the user now will update to 250 $gvEASE from 100 $gvEASE
+        if (_delegates[user] != address(0)) {
+            _delegate(user, _delegates[user]);
+        }
+
         emit Deposited(user, amount);
     }
 
