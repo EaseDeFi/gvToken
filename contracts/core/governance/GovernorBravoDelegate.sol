@@ -273,26 +273,22 @@ contract GovernorBravoDelegate is
 
         Proposal storage proposal = proposals[proposalId];
 
-        // Proposer and admin can cancel
-        if (msg.sender != proposal.proposer && msg.sender != admin) {
+        // Proposer and admin and whitelistGuardian can cancel
+        if (
+            msg.sender != proposal.proposer &&
+            msg.sender != admin &&
+            msg.sender != whitelistGuardian
+        ) {
             // Whitelisted proposers can't be canceled for falling below proposal threshold
-            if (isWhitelisted(proposal.proposer)) {
-                require(
-                    (gvEase.getPriorVotes(
+            require(
+                !isWhitelisted(proposal.proposer) &&
+                    gvEase.getPriorVotes(
                         proposal.proposer,
                         sub256(block.number, 1)
-                    ) < proposalThreshold) && msg.sender == whitelistGuardian,
-                    "GovernorBravo::cancel: whitelisted proposer"
-                );
-            } else {
-                require(
-                    (gvEase.getPriorVotes(
-                        proposal.proposer,
-                        sub256(block.number, 1)
-                    ) < proposalThreshold),
-                    "GovernorBravo::cancel: proposer above threshold"
-                );
-            }
+                    ) <
+                    proposalThreshold,
+                "GovernorBravo::cancel: proposer above threshold"
+            );
         }
 
         proposal.canceled = true;
