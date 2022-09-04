@@ -48,7 +48,7 @@ describe("EaseGovernance", function () {
     const accounts = await ethers.getSigners();
     signers.deployer = accounts[0];
     signers.user = accounts[1];
-    signers.guardian = accounts[2];
+    signers.admin = accounts[2];
     signers.alice = accounts[3];
     signers.bob = accounts[4];
     signers.briber = accounts[5];
@@ -149,7 +149,7 @@ describe("EaseGovernance", function () {
     ).deploy(
       contracts.timelock.address,
       contracts.gvToken.address,
-      signers.guardian.address,
+      signers.admin.address,
       bravoDelegate.address,
       VOTING_PERIOD,
       VOTING_DELAY,
@@ -172,7 +172,7 @@ describe("EaseGovernance", function () {
     signatures = [""];
     calldatas = [
       contracts.timelock.interface.encodeFunctionData("setPendingAdmin", [
-        signers.guardian.address,
+        signers.admin.address,
       ]),
     ];
     description = "Set pending admin of timelock";
@@ -201,7 +201,7 @@ describe("EaseGovernance", function () {
   describe("#initialState", function () {
     it("should initialize contract properly", async function () {
       expect(await contracts.easeGovernance.admin()).to.equal(
-        signers.guardian.address
+        signers.admin.address
       );
 
       expect(await contracts.easeGovernance.name()).to.equal(
@@ -274,7 +274,7 @@ describe("EaseGovernance", function () {
     it("should allow whitelisted account to submit a proposal", async function () {
       const timeNow = await getTimestamp();
       await contracts.easeGovernance
-        .connect(signers.guardian)
+        .connect(signers.admin)
         ._setWhitelistAccountExpiration(
           bobAddress,
           timeNow.add(TIME_IN_SECS.month)
@@ -324,9 +324,7 @@ describe("EaseGovernance", function () {
       await mineNBlocks(VOTING_PERIOD.toNumber());
 
       // queue transaction
-      await contracts.easeGovernance
-        .connect(signers.guardian)
-        .queue(proposalId);
+      await contracts.easeGovernance.connect(signers.admin).queue(proposalId);
       // if we reach here means we successfully queued the transaction
     });
   });
@@ -376,10 +374,10 @@ describe("EaseGovernance", function () {
         .to.emit(contracts.easeGovernance, "ProposalExecuted")
         .withArgs(proposalId);
 
-      // governance should set pending admin as guardian on successful
+      // governance should set pending admin as admin on successful
       // proposal execution
       expect(await contracts.timelock.pendingAdmin()).to.equal(
-        signers.guardian.address
+        signers.admin.address
       );
     });
     it("should update withdrawal delay of gvToken", async function () {
@@ -466,8 +464,19 @@ describe("EaseGovernance", function () {
     });
     it("should allow admin to cancel a proposal", async function () {
       // cancle proposal
+      await contracts.easeGovernance.connect(signers.admin).cancel(proposalId);
+      const proposal = await contracts.easeGovernance.proposals(proposalId);
+
+      expect(proposal.canceled).to.be.true;
+    });
+    it("should allow whitelistGuardain to cancel a proposal", async function () {
+      // cancle proposal
+      const whitelistGuardain = signers.otherAccounts[0];
       await contracts.easeGovernance
-        .connect(signers.guardian)
+        .connect(signers.admin)
+        ._setWhitelistGuardian(whitelistGuardain.address);
+      await contracts.easeGovernance
+        .connect(whitelistGuardain)
         .cancel(proposalId);
       const proposal = await contracts.easeGovernance.proposals(proposalId);
 
@@ -502,7 +511,7 @@ describe("EaseGovernance", function () {
       const oldQuorumVotes = await contracts.easeGovernance.quorumVotes();
       await expect(
         contracts.easeGovernance
-          .connect(signers.guardian)
+          .connect(signers.admin)
           ._setQuorumVotes(newQuorumVotes)
       )
         .to.emit(contracts.easeGovernance, "QuorumVotesSet")
@@ -513,7 +522,7 @@ describe("EaseGovernance", function () {
       const newQuorumVotes = totalSupply.mul(4).div(100);
       await expect(
         contracts.easeGovernance
-          .connect(signers.guardian)
+          .connect(signers.admin)
           ._setQuorumVotes(newQuorumVotes)
       ).to.revertedWith(
         "GovernorBravo::_setQuorumVotes: invalid quorum amount"
@@ -524,7 +533,7 @@ describe("EaseGovernance", function () {
       const newQuorumVotes = totalSupply.mul(51).div(100);
       await expect(
         contracts.easeGovernance
-          .connect(signers.guardian)
+          .connect(signers.admin)
           ._setQuorumVotes(newQuorumVotes)
       ).to.revertedWith(
         "GovernorBravo::_setQuorumVotes: invalid quorum amount"

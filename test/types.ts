@@ -33,6 +33,7 @@ export type Signers = {
   bob: SignerWithAddress;
   gov: SignerWithAddress;
   guardian: SignerWithAddress;
+  admin: SignerWithAddress;
   briber: SignerWithAddress;
   gvToken: SignerWithAddress;
   otherAccounts: SignerWithAddress[];
