@@ -1179,7 +1179,27 @@ describe("GvToken", function () {
     });
     it("should automatically update delegated votes on multiple deposit", async function () {
       const amount = parseEther("100");
-      await depositFor(signers.bob, amount);
+
+      let deadline = (await getTimestamp()).add(1000);
+      const spender = contracts.gvToken.address;
+      let { v, r, s } = await getPermitSignature({
+        signer: signers.bob,
+        token: contracts.ease,
+        value: amount,
+        deadline,
+        spender,
+      });
+      await expect(
+        contracts.gvToken
+          .connect(signers.bob)
+          ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](amount, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.not.emit(contracts.gvToken, "DelegateVotesChanged");
+
       // delegate
       await contracts.gvToken.connect(signers.bob).delegate(aliceAddress);
 
@@ -1200,7 +1220,25 @@ describe("GvToken", function () {
       await mine();
 
       // deposit again
-      await depositFor(signers.bob, amount);
+      deadline = (await getTimestamp()).add(1000);
+      ({ v, r, s } = await getPermitSignature({
+        signer: signers.bob,
+        token: contracts.ease,
+        value: amount,
+        deadline,
+        spender,
+      }));
+      bobBalance = await contracts.gvToken.balanceOf(bobAddress);
+      await expect(
+        contracts.gvToken
+          .connect(signers.bob)
+          ["deposit(uint256,(uint256,uint8,bytes32,bytes32))"](amount, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.emit(contracts.gvToken, "DelegateVotesChanged");
 
       bobBalance = await contracts.gvToken.balanceOf(bobAddress);
 
