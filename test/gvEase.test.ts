@@ -20,7 +20,7 @@ import {
   RCA_CONTROLLER,
   RCA_VAULT,
   RCA_VAULT_1,
-} from "./constants";
+} from "../constants";
 import { getPermitSignature } from "./helpers";
 import BalanceTree from "./helpers/balance-tree";
 import { Contracts, Signers } from "./types";

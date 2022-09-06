@@ -1,7 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, ethers, Signature } from "ethers";
 import { BribePot, EaseToken, GvToken } from "../../src/types";
-import { RCA_VAULT } from "../constants";
+import { RCA_VAULT } from "../../constants";
 import { PermitSigArgs } from "../types";
 import { getTimestamp } from "../utils";
 

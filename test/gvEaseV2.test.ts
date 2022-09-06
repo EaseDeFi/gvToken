@@ -1,6 +1,6 @@
 import { Contracts, Signers } from "./types";
 import { ethers, upgrades } from "hardhat";
-import { RCA_CONTROLLER } from "./constants";
+import { RCA_CONTROLLER } from "../constants";
 import { getTimestamp } from "./utils";
 import {
   ERC1967Proxy__factory,

@@ -8,7 +8,7 @@ import type {
   IERC20,
   IVArmor,
 } from "../src/types";
-import { BUFFER, MAINNET_ADDRESSES } from "./constants";
+import { BUFFER, MAINNET_ADDRESSES } from "../constants";
 import { resetBlockchain } from "./utils";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
 import { expect } from "chai";

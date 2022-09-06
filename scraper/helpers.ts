@@ -6,7 +6,7 @@ import * as path from "path";
 import fs from "fs-extra";
 import csv from "csvtojson";
 import { getProviderRpc } from "../env_helpers";
-import { MAINNET_ADDRESSES } from "../test/constants";
+import { MAINNET_ADDRESSES } from "../constants";
 import erc20Artifact from "../artifacts/contracts/interfaces/IERC20.sol/IERC20Permit.json";
 import { EaseToken } from "../src/types";
 import { TransferEvent } from "../src/types/contracts/core/EaseToken";
@@ -15,7 +15,7 @@ import {
   VARMOR_BLOCK_CREATION_NUMBER,
   SCALING_FACTOR,
   VARMOR_EXCHANGE_RATE,
-} from "./constants";
+} from "../constants";
 
 dayjs.extend(relativeTime);
 

@@ -16,7 +16,7 @@ import {
   EaseToken__factory,
   GvToken__factory,
 } from "../src/types/factories/contracts/core";
-import { RCA_CONTROLLER } from "./constants";
+import { RCA_CONTROLLER } from "../constants";
 import { getPermitSignature } from "./helpers";
 import { Contracts, Signers } from "./types";
 import {

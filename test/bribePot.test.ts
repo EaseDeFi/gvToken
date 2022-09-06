@@ -6,7 +6,7 @@ import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 
 import { EaseToken__factory } from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
-import { RCA_CONTROLLER, RCA_VAULT } from "./constants";
+import { RCA_CONTROLLER, RCA_VAULT } from "../constants";
 import { bribeFor, getPermitSignature } from "./helpers";
 import { Contracts, Signers } from "./types";
 import { getTimestamp, fastForward, mine, TIME_IN_SECS } from "./utils";
