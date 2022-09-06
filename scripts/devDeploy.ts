@@ -19,15 +19,13 @@ import {
   Timelock__factory,
   ERC1967Proxy__factory,
 } from "../src/types";
-import {
-  MAINNET_ADDRESSES,
-  RCA_CONTROLLER,
-  RCA_VAULTS,
-} from "../test/constants";
 import { Contracts, Signers } from "../test/types";
 import { TIME_IN_SECS } from "../test/utils";
 import { bribeFor, depositFor } from "../test/helpers";
 import {
+  MAINNET_ADDRESSES,
+  RCA_CONTROLLER,
+  RCA_VAULTS,
   VOTING_PERIOD,
   VOTING_DELAY,
   PROPOSAL_THRESOLD,

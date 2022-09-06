@@ -4,14 +4,6 @@ import { getContractAddress, parseEther } from "ethers/lib/utils";
 import hre, { ethers, upgrades } from "hardhat";
 
 import {
-  VOTING_DELAY,
-  VOTING_PERIOD,
-  PROPOSAL_THRESOLD,
-  TOKENSWAP_TRANSFER_AMT,
-  GENESIS,
-} from "../constants";
-
-import {
   EaseToken,
   EaseToken__factory,
   TokenSwap,
@@ -25,7 +17,15 @@ import {
   GovernorBravoDelegator__factory,
   ERC1967Proxy__factory,
 } from "../src/types";
-import { MAINNET_ADDRESSES, RCA_CONTROLLER } from "../test/constants";
+import {
+  VOTING_DELAY,
+  VOTING_PERIOD,
+  PROPOSAL_THRESOLD,
+  TOKENSWAP_TRANSFER_AMT,
+  GENESIS,
+  MAINNET_ADDRESSES,
+  RCA_CONTROLLER,
+} from "../constants";
 import { Contracts, Deployers } from "../test/types";
 import { TIME_IN_SECS } from "../test/utils";
 
