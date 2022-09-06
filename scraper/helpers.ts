@@ -13,7 +13,7 @@ import { TransferEvent } from "../src/types/contracts/core/EaseToken";
 import {
   VARMOR_BONUS_START,
   VARMOR_BLOCK_CREATION_NUMBER,
-  SCALING_FACTOR,
+  BUFFER,
   VARMOR_EXCHANGE_RATE,
 } from "../constants";
 
@@ -182,8 +182,6 @@ export async function getFormattedBalanceNodes(): Promise<BalanceNode[]> {
 }
 
 export function getBalanceNodes(): BalanceNode[] {
-  //   write all the details to a json file
-  // fetch  balanceNodes
   const balanceNodesPath = path.resolve(
     __dirname,
     "formattedData",
@@ -198,7 +196,7 @@ export function getBalanceNodes(): BalanceNode[] {
       depositStart: BigNumber.from(balNode.depositStart),
       amount: BigNumber.from(balNode.amount),
     };
-    node.amount = node.amount.mul(VARMOR_EXCHANGE_RATE).div(SCALING_FACTOR);
+    node.amount = node.amount.mul(VARMOR_EXCHANGE_RATE).div(BUFFER);
     balanceNodes.push(node);
   }
   return balanceNodes;

@@ -40,4 +40,3 @@ export const VARMOR_BLOCK_CREATION_NUMBER = 13511162;
 export const VARMOR_BONUS_START = BigNumber.from(1649894400);
 // vArmor to armor exchange rate
 export const VARMOR_EXCHANGE_RATE = parseUnits("1176860757679165373", 0);
-export const SCALING_FACTOR = BigNumber.from(10).pow(18);
