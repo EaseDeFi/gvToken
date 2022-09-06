@@ -1,9 +1,13 @@
 import { BigNumber } from "ethers";
+import { parseUnits } from "ethers/lib/utils";
 
 // block number before vArm
-export const vArmorCreationBlockNumber = 13511162;
+export const VARMOR_BLOCK_CREATION_NUMBER = 13511162;
 // Thu Apr 14 2022 00:00:00 GMT+0000
-export const vArmorBonusStart = BigNumber.from(1649894400);
+export const VARMOR_BONUS_START = BigNumber.from(1649894400);
+// vArmor to armor exchange rate
+export const VARMOR_EXCHANGE_RATE = parseUnits("1176860757679165373", 0);
+export const SCALING_FACTOR = BigNumber.from(10).pow(18);
 
 // Addresses that has transferred vArmor to other wallets
 export const TransferringAddresses = [

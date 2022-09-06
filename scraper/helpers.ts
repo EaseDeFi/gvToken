@@ -10,12 +10,18 @@ import { MAINNET_ADDRESSES } from "../test/constants";
 import erc20Artifact from "../artifacts/contracts/interfaces/IERC20.sol/IERC20Permit.json";
 import { EaseToken } from "../src/types";
 import { TransferEvent } from "../src/types/contracts/core/EaseToken";
-import { vArmorBonusStart, vArmorCreationBlockNumber } from "./constants";
+import {
+  VARMOR_BONUS_START,
+  VARMOR_BLOCK_CREATION_NUMBER,
+  SCALING_FACTOR,
+  VARMOR_EXCHANGE_RATE,
+} from "./constants";
 
 dayjs.extend(relativeTime);
 
 import type {
   AccountEventDetail,
+  Balance,
   BalanceNode,
   HolderDetail,
   HolderDetailCSV,
@@ -61,7 +67,7 @@ export async function getTransferEvents(
   address: string,
   toBlock: number | string = "latest"
 ) {
-  const fromBlock = vArmorCreationBlockNumber;
+  const fromBlock = VARMOR_BLOCK_CREATION_NUMBER;
 
   const token = await getVarmorContract();
   const transferFilter = token.filters.Transfer(address);
@@ -162,8 +168,8 @@ export async function getFormattedBalanceNodes(): Promise<BalanceNode[]> {
 
     // check if normalized time is before april 14th 2022
     // if true use april 14th instead
-    const depositStart = normalizedStartTime.gt(vArmorBonusStart)
-      ? vArmorBonusStart
+    const depositStart = normalizedStartTime.lt(VARMOR_BONUS_START)
+      ? VARMOR_BONUS_START
       : normalizedStartTime;
     const userBalance: BalanceNode = {
       account: holderDetail.account,
@@ -173,4 +179,27 @@ export async function getFormattedBalanceNodes(): Promise<BalanceNode[]> {
     balances.push(userBalance);
   }
   return balances;
+}
+
+export function getBalanceNodes(): BalanceNode[] {
+  //   write all the details to a json file
+  // fetch  balanceNodes
+  const balanceNodesPath = path.resolve(
+    __dirname,
+    "formattedData",
+    "balanceNodes.json"
+  );
+  const formattedBalNodesData = fs.readFileSync(balanceNodesPath, "utf-8");
+  const storedBalNodes = JSON.parse(formattedBalNodesData) as Balance[];
+  const balanceNodes: BalanceNode[] = [];
+  for (const balNode of storedBalNodes) {
+    const node: BalanceNode = {
+      account: balNode.account,
+      depositStart: BigNumber.from(balNode.depositStart),
+      amount: BigNumber.from(balNode.amount),
+    };
+    node.amount = node.amount.mul(VARMOR_EXCHANGE_RATE).div(SCALING_FACTOR);
+    balanceNodes.push(node);
+  }
+  return balanceNodes;
 }
