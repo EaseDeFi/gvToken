@@ -668,6 +668,50 @@ describe("GvToken", function () {
         // check ease balance
         expect(aliceEaseBalBefore.sub(aliceEaseBalAfter)).to.equal(aliceValue);
       });
+      it("should not allow vArmor holders to recieve extra power on multiple deposit", async function () {
+        // Bob deposit
+        let deadline = (await getTimestamp()).add(1000);
+        const spender = contracts.gvToken.address;
+        const bobProof = powerTree.getProof(
+          bobAddress,
+          bobValue,
+          bobDepositStart
+        );
+        let { v, r, s } = await getPermitSignature({
+          signer: signers.bob,
+          token: contracts.ease,
+          value: bobValue,
+          deadline,
+          spender,
+        });
+        await contracts.gvToken
+          .connect(signers.bob)
+          [
+            "deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"
+          ](bobValue, bobDepositStart, bobProof, { v, r, s, deadline });
+
+        const bobGvBal = await contracts.gvToken.balanceOf(bobAddress);
+
+        expect(bobGvBal).to.gt(bobValue.add(parseEther("10")));
+        // update deadline
+        deadline = (await getTimestamp()).add(1000);
+        // update permit args
+        ({ v, r, s } = await getPermitSignature({
+          signer: signers.bob,
+          token: contracts.ease,
+          value: bobValue,
+          deadline,
+          spender,
+        }));
+        // This should fail
+        await expect(
+          contracts.gvToken
+            .connect(signers.bob)
+            [
+              "deposit(uint256,uint256,bytes32[],(uint256,uint8,bytes32,bytes32))"
+            ](bobValue, bobDepositStart, bobProof, { v, r, s, deadline })
+        ).to.revertedWith("power already claimed!");
+      });
     });
     describe("depositWithArmor()", function () {
       it("should allow armor holder's to swap Armor for gvEase", async function () {
