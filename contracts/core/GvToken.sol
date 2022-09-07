@@ -115,7 +115,9 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         address _tokenSwap,
         uint256 _genesis
     ) external initializer {
+        __ERC1967Upgrade_init();
         __Ownable_init();
+        __UUPSUpgradeable_init();
         pot = IBribePot(_pot);
         stakingToken = IERC20Permit(_stakingToken);
         rcaController = IRcaController(_rcaController);
