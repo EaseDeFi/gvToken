@@ -207,6 +207,47 @@ describe("BribePot", function () {
         })
       ).to.revertedWith("nothing to bribe");
     });
+    it("should allow users to bribe => cancel => and bribe again immediately", async function () {
+      const gvAmount = parseEther("100");
+      const balBeforeBribe = await contracts.ease.balanceOf(briberAddress);
+
+      //  deposit to pot
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+      // call bribe
+      const bribePerWeek = parseEther("10");
+      const rcaVaultAddress = RCA_VAULT;
+      const numOfWeeks = 4;
+      await bribeFor(
+        signers.briber,
+        bribePerWeek,
+        contracts.bribePot,
+        contracts.ease,
+        numOfWeeks,
+        rcaVaultAddress
+      );
+      // Cancle bribe
+      await contracts.bribePot
+        .connect(signers.briber)
+        .cancelBribe(rcaVaultAddress);
+      // bribe again
+      const balAfterBribeCancel = await contracts.ease.balanceOf(briberAddress);
+      expect(balAfterBribeCancel).to.equal(balBeforeBribe);
+      // it should allow to bribe quickly after cancelling
+      await bribeFor(
+        signers.briber,
+        bribePerWeek,
+        contracts.bribePot,
+        contracts.ease,
+        numOfWeeks,
+        rcaVaultAddress
+      );
+      const balNow = await contracts.ease.balanceOf(briberAddress);
+      expect(balAfterBribeCancel.sub(balNow)).to.equal(
+        bribePerWeek.mul(numOfWeeks)
+      );
+    });
     it("should allow user to bribe the % of pot", async function () {
       // call deposit
       const gvAmount = parseEther("100");
