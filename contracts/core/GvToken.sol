@@ -85,8 +85,9 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
     mapping(address => Deposit[]) private _deposits;
     /// @notice total amount of ease deposited on user behalf
     mapping(address => uint256) private _totalDeposit;
-    /// @notice Total percent of balance staked by user to different RCA-vaults
 
+    /// @notice Extra power claimed by vArmor holder
+    mapping(address => bool) private _claimed;
     /* ========== EVENTS ========== */
     event Deposited(address indexed user, uint256 amount);
     event RedeemRequest(address indexed user, uint256 amount, uint256 endTime);
@@ -114,7 +115,9 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         address _tokenSwap,
         uint256 _genesis
     ) external initializer {
+        __ERC1967Upgrade_init();
         __Ownable_init();
+        __UUPSUpgradeable_init();
         pot = IBribePot(_pot);
         stakingToken = IERC20Permit(_stakingToken);
         rcaController = IRcaController(_rcaController);
@@ -481,9 +484,10 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         PermitArgs memory permit
     ) internal {
         bytes32 leaf = keccak256(abi.encodePacked(user, amount, depositStart));
-
+        require(!_claimed[user], "power already claimed!");
         require(MerkleProof.verify(proof, _powerRoot, leaf), "invalid proof");
         require(depositStart >= genesis, "depositStart < genesis");
+        _claimed[user] = true;
 
         _deposit(user, amount, depositStart, permit, false);
     }
