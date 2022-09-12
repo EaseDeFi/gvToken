@@ -1382,4 +1382,11 @@ describe("GvToken", function () {
       await contracts.gvToken.setPower(root);
     });
   });
+  describe("setPotAddress()", function () {
+    it("should allow governance to set new bribepot address", async function () {
+      const newPotAddress = signers.otherAccounts[0].address;
+      await contracts.gvToken.setPotAddress(newPotAddress);
+      expect(await contracts.gvToken.pot()).to.equal(newPotAddress);
+    });
+  });
 });

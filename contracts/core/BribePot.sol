@@ -82,8 +82,7 @@ contract BribePot {
         address indexed user,
         address indexed vault,
         uint256 bribePerWeek,
-        uint256 expiryWeek, // this will always currentWeek + 1
-        uint256 endWeek
+        uint256 expiryWeek // this will always currentWeek + 1
     );
 
     /* ========== MODIFIERS ========== */
@@ -175,6 +174,7 @@ contract BribePot {
         PermitArgs memory permit
     ) external {
         require(_totalSupply > 0, "nothing to bribe");
+        require(numOfWeeks != 0, "number of weeks can't be zero");
 
         require(rcaController.activeShields(vault), "inactive vault");
 
@@ -248,13 +248,7 @@ contract BribePot {
             rewardsToken.safeTransfer(briber, amountToRefund);
         }
 
-        emit BribeCanceled(
-            briber,
-            vault,
-            userBribe.rate,
-            currWeek + 1,
-            userBribe.endWeek
-        );
+        emit BribeCanceled(briber, vault, userBribe.rate, currWeek + 1);
     }
 
     /* ========== VIEWS ========== */
