@@ -288,6 +288,39 @@ describe("BribePot", function () {
       expect(bribeDetail.startWeek).to.equal(expectedStartWeek);
       expect(bribeDetail.endWeek).to.equal(expectedEndWeek);
     });
+    it("should not allow users to bribe if numOfWeeks is zero", async function () {
+      const gvAmount = parseEther("100");
+
+      //  deposit to pot
+      await contracts.bribePot
+        .connect(signers.gvToken)
+        .deposit(aliceAddress, gvAmount);
+      const bribePerWeek = parseEther("10");
+      const rcaVaultAddress = RCA_VAULT;
+      const numOfWeeks = 0;
+      const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
+      const spender = contracts.bribePot.address;
+      const deadline = (await getTimestamp()).add(1000);
+      const { v, r, s } = await getPermitSignature({
+        signer: signers.briber,
+        token: contracts.ease,
+        value: totalBribeAmt,
+        deadline,
+        spender,
+      });
+
+      // adding bribe amount to pot with numOfWeeks 0 should revert
+      await expect(
+        contracts.bribePot
+          .connect(signers.briber)
+          .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.revertedWith("number of weeks can't be zero");
+    });
     it("should not allow user to have multiple bribe for same vault", async function () {
       // call deposit
       const gvAmount = parseEther("100");

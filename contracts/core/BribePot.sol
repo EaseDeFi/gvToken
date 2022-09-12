@@ -175,6 +175,7 @@ contract BribePot {
         PermitArgs memory permit
     ) external {
         require(_totalSupply > 0, "nothing to bribe");
+        require(numOfWeeks != 0, "number of weeks can't be zero");
 
         require(rcaController.activeShields(vault), "inactive vault");
 
