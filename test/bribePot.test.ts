@@ -433,9 +433,17 @@ describe("BribePot", function () {
       await fastForward(TIME_IN_SECS.week - 100);
       await mine();
       const userEaseBalBefore = await contracts.ease.balanceOf(briberAddress);
-      await contracts.bribePot
-        .connect(signers.briber)
-        .cancelBribe(rcaVaultAddress);
+
+      const currWeek = (await getTimestamp())
+        .sub(await contracts.bribePot.genesis())
+        .div(TIME_IN_SECS.week)
+        .add(1);
+      await expect(
+        contracts.bribePot.connect(signers.briber).cancelBribe(rcaVaultAddress)
+      )
+        .to.emit(contracts.bribePot, "BribeCanceled")
+        .withArgs(briberAddress, rcaVaultAddress, bribePerWeek, currWeek);
+
       const userEaseBalAfter = await contracts.ease.balanceOf(briberAddress);
       expect(userEaseBalAfter.sub(userEaseBalBefore)).to.equal(
         bribePerWeek.mul(3)
