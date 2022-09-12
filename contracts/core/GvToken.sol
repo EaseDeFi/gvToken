@@ -126,6 +126,13 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         metadata = MetaData("Growing Vote Ease", "gvEase", 18);
     }
 
+    ///@notice Reinitialize necessary parameters
+    ///@param _pot Address of a bribePot
+    function reinitialize(address _pot) external reinitializer(2) onlyOwner {
+        __UUPSUpgradeable_init();
+        pot = IBribePot(_pot);
+    }
+
     /* ========== MUTATIVE FUNCTIONS ========== */
     /// @notice Deposit ease and recieve gvEASE
     /// @param amount Amount of ease to deposit.
@@ -375,6 +382,12 @@ contract GvToken is Delegable, UUPSUpgradeable, OwnableUpgradeable {
         require(newTotalSupply > _totalSupply, "existing > new amount");
 
         _totalSupply = newTotalSupply;
+    }
+
+    /// @notice Set Pot address
+    /// @param _pot new bribe pot address
+    function setPotAddress(address _pot) external onlyOwner {
+        pot = IBribePot(_pot);
     }
 
     /* ========== VIEW FUNCTIONS ========== */
