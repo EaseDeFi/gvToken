@@ -1,5 +1,5 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber } from "ethers";
+import { BigNumber, Signer } from "ethers";
 import {
   EaseToken,
   TokenSwap,
@@ -39,14 +39,15 @@ export type Signers = {
   otherAccounts: SignerWithAddress[];
 };
 export type Deployers = {
-  tokenSwapDeployer: SignerWithAddress;
-  easeDeployer: SignerWithAddress;
-  bribePotDeployer: SignerWithAddress;
-  gvTokenImplDeployer: SignerWithAddress;
-  gvTokenProxyDeployer: SignerWithAddress;
-  timelockDeployer: SignerWithAddress;
-  govDelegateDeployer: SignerWithAddress;
-  govDelegatorDeployer: SignerWithAddress;
+  tokenSwapDeployer: Signer;
+  easeDeployer: Signer;
+  bribePotProxyDeployer: Signer;
+  gvTokenImplDeployer: Signer;
+  gvTokenProxyDeployer: Signer;
+  timelockDeployer: Signer;
+  govDelegateDeployer: Signer;
+  govDelegatorDeployer: Signer;
+  bribePotImplDeployer: Signer;
 };
 
 export type MainnetAddresses = {
