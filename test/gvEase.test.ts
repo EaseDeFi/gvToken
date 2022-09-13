@@ -89,11 +89,7 @@ describe("GvToken", function () {
     ).deploy(signers.gov.address);
     const easeAddress = contracts.ease.address;
 
-    contracts.bribePot = await BribePotFactory.deploy(
-      gvTokenAddress,
-      easeAddress,
-      RCA_CONTROLLER
-    );
+    contracts.bribePot = await BribePotFactory.deploy();
 
     // Deploy gvToken
     // Validate GvToken Implementation for upgradability
@@ -125,7 +121,12 @@ describe("GvToken", function () {
         MAINNET_ADDRESSES.vArmor
       )
     );
-
+    // Initialize bribe pot
+    await contracts.bribePot.initialize(
+      gvTokenAddress,
+      easeAddress,
+      RCA_CONTROLLER
+    );
     await hre.network.provider.send("hardhat_impersonateAccount", [
       MAINNET_ADDRESSES.vArmorWhale,
     ]);

@@ -1,10 +1,14 @@
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { getContractAddress, parseEther } from "ethers/lib/utils";
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 
-import { EaseToken__factory } from "../src/types";
+import {
+  BribePot,
+  EaseToken__factory,
+  ERC1967Proxy__factory,
+} from "../src/types";
 import { BribePot__factory } from "../src/types/factories/contracts/core/BribePot__factory";
 import { RCA_CONTROLLER, RCA_VAULT } from "./constants";
 import { bribeFor, getPermitSignature } from "./helpers";
@@ -24,6 +28,7 @@ describe("BribePot", function () {
     signers.briber = accounts[2];
     signers.alice = accounts[3];
     signers.bob = accounts[4];
+    signers.deployer = accounts[5];
     signers.otherAccounts = accounts.slice(5);
 
     // update addresses
@@ -34,39 +39,75 @@ describe("BribePot", function () {
 
   beforeEach(async function () {
     const EaseTokenFactory = <EaseToken__factory>(
-      await ethers.getContractFactory("EaseToken")
+      await ethers.getContractFactory("EaseToken", signers.deployer)
     );
 
     const BribePotFactory = <BribePot__factory>(
-      await ethers.getContractFactory("BribePot")
+      await ethers.getContractFactory("BribePot", signers.deployer)
+    );
+    const ERC1977ProxyFactory = <ERC1967Proxy__factory>(
+      await ethers.getContractFactory("ERC1967Proxy", signers.deployer)
     );
 
-    const nonce = await signers.gvToken.getTransactionCount();
+    const nonce = await signers.deployer.getTransactionCount();
     const easeAddress = getContractAddress({
-      from: signers.gvToken.address,
+      from: signers.deployer.address,
       nonce,
     });
 
     contracts.ease = await EaseTokenFactory.deploy(signers.gov.address);
 
-    contracts.bribePot = await BribePotFactory.deploy(
-      signers.gvToken.address,
-      easeAddress,
-      RCA_CONTROLLER
+    // Validate BribePot Implementation for upgradability
+    await upgrades.validateImplementation(BribePotFactory);
+
+    contracts.bribePot = await BribePotFactory.deploy();
+
+    const callData = contracts.bribePot.interface.encodeFunctionData(
+      "initialize",
+      [signers.gvToken.address, easeAddress, RCA_CONTROLLER]
+    );
+    const proxy = await ERC1977ProxyFactory.deploy(
+      contracts.bribePot.address,
+      callData
+    );
+
+    await proxy.deployed();
+
+    // update gvToken to proxy
+    contracts.bribePot = <BribePot>(
+      await ethers.getContractAt("BribePot", proxy.address)
     );
     // fund user accounts with EASE token
     await contracts.ease
-      .connect(signers.gvToken)
+      .connect(signers.deployer)
       .transfer(bobAddress, parseEther("1000000"));
     await contracts.ease
-      .connect(signers.gvToken)
+      .connect(signers.deployer)
       .transfer(aliceAddress, parseEther("1000000"));
     await contracts.ease
-      .connect(signers.gvToken)
+      .connect(signers.deployer)
       .transfer(signers.gvToken.address, parseEther("1000000"));
     await contracts.ease
-      .connect(signers.gvToken)
+      .connect(signers.deployer)
       .transfer(briberAddress, parseEther("1000000"));
+  });
+
+  describe("#initialState", function () {
+    it("should initialize the contract state correctly", async function () {
+      const genesis = (await getTimestamp())
+        .div(TIME_IN_SECS.week)
+        .mul(TIME_IN_SECS.week);
+
+      expect(await contracts.bribePot.genesis()).to.equal(genesis);
+      expect(await contracts.bribePot.periodFinish()).to.equal(genesis);
+      expect(await contracts.bribePot.lastRewardUpdate()).to.equal(genesis);
+      expect(await contracts.bribePot.lastBribeUpdate()).to.equal(0);
+
+      expect(await contracts.bribePot.owner()).to.equal(
+        signers.deployer.address
+      );
+      expect(await contracts.bribePot.name()).to.equal("Ease Bribe Pot");
+    });
   });
 
   describe("restricted", function () {

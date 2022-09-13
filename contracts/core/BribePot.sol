@@ -1,13 +1,17 @@
 /// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.11;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+
 import "../interfaces/IERC20.sol";
 import "../interfaces/IRcaController.sol";
 
 // solhint-disable not-rely-on-time
+// solhint-disable no-empty-blocks
 
-contract BribePot {
+contract BribePot is OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Permit;
 
     /* ========== structs ========== */
@@ -31,30 +35,34 @@ contract BribePot {
         bytes32 r;
         bytes32 s;
     }
+    struct TimeStamps {
+        /// @notice Nearest floor week in timestamp before deployment
+        uint32 genesis;
+        /// @notice Time upto which bribe rewards are active
+        uint32 periodFinish;
+        /// @notice Last updated timestamp
+        uint32 lastRewardUpdate;
+        /// @notice week upto which bribes has been updated (aka expired)
+        uint32 lastBribeUpdate;
+    }
 
     /* ========== CONSTANTS ========== */
     uint256 private constant WEEK = 1 weeks;
     uint256 private constant MULTIPLIER = 1e18;
 
     /* ========== STATE ========== */
-    string public name = "Ease Bribe Pot";
-    IERC20Permit public immutable rewardsToken;
-    IRcaController public immutable rcaController;
+    string public name;
+    IERC20Permit public rewardsToken;
+    IRcaController public rcaController;
     address public gvToken;
-    /// @notice Time upto which bribe rewards are active
-    uint256 public periodFinish = 0;
-    /// @notice Last updated timestamp
-    uint256 public lastRewardUpdate;
+    ///@notice Cumalitive amount of rewards per token since genesis
     uint256 public rewardPerTokenStored;
-    /// @notice week upto which bribes has been updated (aka expired)
-    uint256 public lastBribeUpdate;
-    /// @notice Nearest floor week in timestamp before deployment
-    uint256 public immutable genesis = (block.timestamp / WEEK) * WEEK;
 
+    TimeStamps private time;
     /// @notice total gvEASE deposited to bribe pot
     uint256 private _totalSupply;
     /// @notice Bribe per week stored at last bribe update week
-    uint256 private _bribeRateStored = 0;
+    uint256 private _bribeRateStored;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
     /// @notice Ease rewards stored for bribing gvEASE
@@ -92,16 +100,20 @@ contract BribePot {
     }
 
     /* ========== CONSTRUCTOR ========== */
-    constructor(
+    function initialize(
         address _gvToken,
         address _rewardsToken,
         address _rcaController
-    ) {
+    ) external initializer {
+        __Ownable_init();
+        __ERC1967Upgrade_init();
         rewardsToken = IERC20Permit(_rewardsToken);
         gvToken = _gvToken;
-        lastRewardUpdate = genesis;
-        periodFinish = genesis;
         rcaController = IRcaController(_rcaController);
+        // timestamp rounded to nearest week floor
+        uint32 timeNow = uint32((block.timestamp / WEEK) * WEEK);
+        time = TimeStamps(timeNow, timeNow, timeNow, 0);
+        name = "Ease Bribe Pot";
     }
 
     /* ========== EXTERNAL FUNCTIONS ========== */
@@ -178,7 +190,7 @@ contract BribePot {
 
         require(rcaController.activeShields(vault), "inactive vault");
 
-        uint256 startWeek = ((block.timestamp - genesis) / WEEK) + 1;
+        uint256 startWeek = ((block.timestamp - time.genesis) / WEEK) + 1;
         uint256 endWeek = startWeek + numOfWeeks;
         address briber = msg.sender;
         // check if bribe already exists
@@ -201,9 +213,9 @@ contract BribePot {
         bribeRates[endWeek].expireAmt += uint112(bribeRate);
 
         // update reward period finish
-        uint256 bribeFinish = genesis + (endWeek * WEEK);
-        if (bribeFinish > periodFinish) {
-            periodFinish = bribeFinish;
+        uint256 bribeFinish = time.genesis + (endWeek * WEEK);
+        if (bribeFinish > time.periodFinish) {
+            time.periodFinish = uint32(bribeFinish);
         }
 
         emit BribeAdded(briber, vault, bribeRate, startWeek, endWeek);
@@ -232,12 +244,14 @@ contract BribePot {
 
         // update reward end week if this is the last bribe of
         // the system
-        uint256 endTime = (userBribe.endWeek * WEEK) + genesis;
-        if (endTime == periodFinish) {
+        uint256 endTime = (userBribe.endWeek * WEEK) + time.genesis;
+        if (endTime == time.periodFinish) {
             uint256 lastBribeEndWeek = userBribe.endWeek;
             while (lastBribeEndWeek > currWeek) {
                 if (bribeRates[lastBribeEndWeek].expireAmt != 0) {
-                    periodFinish = genesis + (lastBribeEndWeek * WEEK);
+                    time.periodFinish = uint32(
+                        time.genesis + (lastBribeEndWeek * WEEK)
+                    );
                     break;
                 }
                 lastBribeEndWeek--;
@@ -253,6 +267,26 @@ contract BribePot {
 
     /* ========== VIEWS ========== */
 
+    /// @notice Nearest floor week in timestamp before deployment
+    function genesis() external view returns (uint256) {
+        return time.genesis;
+    }
+
+    /// @notice Time upto which bribe rewards are active
+    function periodFinish() external view returns (uint256) {
+        return time.periodFinish;
+    }
+
+    /// @notice Last updated timestamp
+    function lastRewardUpdate() external view returns (uint256) {
+        return time.lastRewardUpdate;
+    }
+
+    /// @notice week upto which bribes has been updated (aka expired)
+    function lastBribeUpdate() external view returns (uint256) {
+        return time.lastBribeUpdate;
+    }
+
     function totalSupply() external view returns (uint256) {
         return _totalSupply;
     }
@@ -262,7 +296,10 @@ contract BribePot {
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
-        return block.timestamp < periodFinish ? block.timestamp : periodFinish;
+        return
+            block.timestamp < time.periodFinish
+                ? block.timestamp
+                : time.periodFinish;
     }
 
     function rewardPerToken() external view returns (uint256) {
@@ -343,6 +380,8 @@ contract BribePot {
     }
 
     /* ========== INTERNAL ========== */
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
     ///@notice Update rewards collected and rewards per token paid
     ///for the user's account
     function _update(address account) internal {
@@ -352,7 +391,7 @@ contract BribePot {
             uint256 bribeUpdatedUpto
         ) = _getBribeUpdates();
 
-        lastBribeUpdate = bribeUpdatedUpto;
+        time.lastBribeUpdate = uint32(bribeUpdatedUpto);
         _bribeRateStored = currBribePerWeek;
 
         rewardPerTokenStored = _rewardPerToken(
@@ -361,7 +400,7 @@ contract BribePot {
         );
 
         // should be updated after calculating _rewardPerToken()
-        lastRewardUpdate = lastTimeRewardApplicable();
+        time.lastRewardUpdate = uint32(lastTimeRewardApplicable());
 
         if (account != address(0)) {
             rewards[account] = _earned(account, rewardPerTokenStored);
@@ -391,7 +430,7 @@ contract BribePot {
 
     ///@notice Current week count from genesis starts at 0
     function _getCurrWeek() internal view returns (uint256) {
-        return ((block.timestamp - genesis) / WEEK);
+        return ((block.timestamp - time.genesis) / WEEK);
     }
 
     ///@notice calculates bribe rate for current week
@@ -402,7 +441,7 @@ contract BribePot {
         view
         returns (uint256 currBribePerWeek)
     {
-        uint256 _lastBribeUpdate = lastBribeUpdate;
+        uint256 _lastBribeUpdate = time.lastBribeUpdate;
         uint256 bribeUpdatedUpto = _lastBribeUpdate;
         uint256 currWeek = _getCurrWeek();
         currBribePerWeek = _bribeRateStored;
@@ -435,11 +474,11 @@ contract BribePot {
         )
     {
         // keep backup of where we started
-        uint256 _lastBribeUpdate = lastBribeUpdate;
+        uint256 _lastBribeUpdate = time.lastBribeUpdate;
 
         bribeUpdatedUpto = _lastBribeUpdate;
         uint256 currWeek = _getCurrWeek();
-        uint256 rewardedUpto = (lastRewardUpdate - genesis) % WEEK;
+        uint256 rewardedUpto = (time.lastRewardUpdate - time.genesis) % WEEK;
 
         currentBribePerWeek = _bribeRateStored;
         BribeRate memory rates;
@@ -492,7 +531,7 @@ contract BribePot {
         uint256 additionalRewardPerToken,
         uint256 currBribePerWeek
     ) internal view returns (uint256 calcRewardPerToken) {
-        uint256 lastUpdate = lastRewardUpdate;
+        uint256 lastUpdate = time.lastRewardUpdate;
         uint256 timestamp = block.timestamp;
         // if last reward update is before current week we need to
         // set it to end of last week as getBribeUpdates() has
