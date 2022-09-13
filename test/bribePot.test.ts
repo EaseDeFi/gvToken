@@ -49,7 +49,10 @@ describe("BribePot", function () {
 
     contracts.ease = await EaseTokenFactory.deploy(signers.gov.address);
 
-    contracts.bribePot = await BribePotFactory.deploy(
+    contracts.bribePot = await BribePotFactory.deploy();
+    await contracts.bribePot.deployed();
+    // Initialize bribe pot
+    await contracts.bribePot.initialize(
       signers.gvToken.address,
       easeAddress,
       RCA_CONTROLLER

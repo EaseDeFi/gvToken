@@ -128,11 +128,9 @@ describe("EaseGovernance", function () {
     );
 
     // 2nd transaction
-    contracts.bribePot = await BribePotFactory.connect(signers.deployer).deploy(
-      gvTokenAddress,
-      easeAddress,
-      RCA_CONTROLLER
-    );
+    contracts.bribePot = await BribePotFactory.connect(
+      signers.deployer
+    ).deploy();
     // 3rd transaction
     contracts.timelock = await TimelockFactory.connect(signers.deployer).deploy(
       govAddress,
@@ -161,6 +159,12 @@ describe("EaseGovernance", function () {
       bravoDelegator.address
     );
 
+    // initialize bribepot
+    await contracts.bribePot.initialize(
+      gvTokenAddress,
+      easeAddress,
+      RCA_CONTROLLER
+    );
     // transfer EASE token to wallets
     await contracts.ease.transfer(userAddress, parseEther("1000000"));
     await contracts.ease.transfer(aliceAddress, parseEther("1000000"));
