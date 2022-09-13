@@ -15,7 +15,6 @@ describe("GvTokenV2", function () {
   const contracts = {} as Contracts;
   const signers = {} as Signers;
   let bribePotAddress: string;
-  let bribePotAddress2: string;
   let easeAddress: string;
   let tokenSwapAddress: string;
   beforeEach(async function () {
@@ -26,7 +25,6 @@ describe("GvTokenV2", function () {
     bribePotAddress = accounts[2].address;
     easeAddress = accounts[3].address;
     tokenSwapAddress = accounts[4].address;
-    bribePotAddress2 = accounts[5].address;
     const GvTokenFactory = <GvToken__factory>(
       await ethers.getContractFactory("GvToken")
     );
@@ -84,6 +82,12 @@ describe("GvTokenV2", function () {
 
     const gvTokenV2Impl = await GvTokenV2Factory.deploy();
     await gvTokenV2Impl.deployed();
+    // check initialized arguments before contract upgrade
+    expect(await contracts.gvToken.pot()).to.equal(bribePotAddress);
+    expect(await contracts.gvToken.genesis()).to.equal(GENESIS);
+    expect(await contracts.gvToken.rcaController()).to.equal(RCA_CONTROLLER);
+    expect(await contracts.gvToken.tokenSwap()).to.equal(tokenSwapAddress);
+    expect(await contracts.gvToken.stakingToken()).to.equal(easeAddress);
 
     await contracts.gvToken.upgradeTo(gvTokenV2Impl.address);
 
@@ -92,42 +96,6 @@ describe("GvTokenV2", function () {
 
     // checking v1 storage values
     expect(await contracts.gvTokenV2.pot()).to.equal(bribePotAddress);
-    expect(await contracts.gvTokenV2.stakingToken()).to.equal(easeAddress);
-  });
-  it("should upgrade and reinitialize the contract", async function () {
-    contracts.gvTokenV2 = <GvTokenV2>(
-      await ethers.getContractAt("GvTokenV2", contracts.gvToken.address)
-    );
-    const GvTokenV2Factory = <GvTokenV2__factory>(
-      await ethers.getContractFactory("GvTokenV2")
-    );
-    // Validate implementation
-    await upgrades.validateImplementation(GvTokenV2Factory);
-
-    const gvTokenV2Impl = await GvTokenV2Factory.deploy();
-    await gvTokenV2Impl.deployed();
-
-    // check initialized arguments before contract upgrade
-    expect(await contracts.gvToken.pot()).to.equal(bribePotAddress);
-    expect(await contracts.gvToken.genesis()).to.equal(GENESIS);
-    expect(await contracts.gvToken.rcaController()).to.equal(RCA_CONTROLLER);
-    expect(await contracts.gvToken.tokenSwap()).to.equal(tokenSwapAddress);
-    expect(await contracts.gvToken.stakingToken()).to.equal(easeAddress);
-
-    const callData = gvTokenV2Impl.interface.encodeFunctionData(
-      "reinitialize",
-      [bribePotAddress2]
-    );
-
-    await expect(
-      contracts.gvToken.upgradeToAndCall(gvTokenV2Impl.address, callData)
-    )
-      .to.emit(contracts.gvToken, "Initialized")
-      .withArgs(2);
-    // check initialized arguments after contract upgrade
-    // check bribe pot address after
-    expect(await contracts.gvToken.pot()).to.equal(bribePotAddress2);
-    // check previous args are unchanged
     expect(await contracts.gvToken.genesis()).to.equal(GENESIS);
     expect(await contracts.gvToken.rcaController()).to.equal(RCA_CONTROLLER);
     expect(await contracts.gvToken.tokenSwap()).to.equal(tokenSwapAddress);
