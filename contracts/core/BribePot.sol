@@ -1,6 +1,8 @@
 /// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.11;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 import "../interfaces/IERC20.sol";
@@ -9,7 +11,7 @@ import "../interfaces/IRcaController.sol";
 // solhint-disable not-rely-on-time
 // solhint-disable no-empty-blocks
 
-contract BribePot {
+contract BribePot is OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Permit;
 
     /* ========== structs ========== */
@@ -53,11 +55,10 @@ contract BribePot {
     IERC20Permit public rewardsToken;
     IRcaController public rcaController;
     address public gvToken;
-    TimeStamps private time;
-
     ///@notice Cumalitive amount of rewards per token since genesis
     uint256 public rewardPerTokenStored;
 
+    TimeStamps private time;
     /// @notice total gvEASE deposited to bribe pot
     uint256 private _totalSupply;
     /// @notice Bribe per week stored at last bribe update week
@@ -103,14 +104,15 @@ contract BribePot {
         address _gvToken,
         address _rewardsToken,
         address _rcaController
-    ) external {
+    ) external initializer {
+        __Ownable_init();
+        __ERC1967Upgrade_init();
         rewardsToken = IERC20Permit(_rewardsToken);
         gvToken = _gvToken;
         rcaController = IRcaController(_rcaController);
         // timestamp rounded to nearest week floor
         uint32 timeNow = uint32((block.timestamp / WEEK) * WEEK);
         time = TimeStamps(timeNow, timeNow, timeNow, 0);
-
         name = "Ease Bribe Pot";
     }
 
@@ -378,6 +380,7 @@ contract BribePot {
     }
 
     /* ========== INTERNAL ========== */
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     ///@notice Update rewards collected and rewards per token paid
     ///for the user's account
