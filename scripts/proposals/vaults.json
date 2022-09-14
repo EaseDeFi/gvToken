@@ -1,0 +1,747 @@
+[
+  {
+    "symbol": "ez-yvDAI",
+    "name": "yvDAI Ease Vault",
+    "address": "0xEA5EDeF1BCDBbcc54D47f0fD28D676f9e5049734",
+    "display_name": "yvDAI",
+    "top_protocol": "yearn",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+    "info": "Navigate to the [Yearn DAI Vault], deposit DAI, ETH, or WETH tokens into the vault, then deposit the yvDAI tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link": "https://yearn.finance/#/vault/0xdA816459F1AB5631232FE5e97a05BBBb94970c95",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "yvDAI",
+      "name": "DAI Yearn Vault",
+      "address": "0xdA816459F1AB5631232FE5e97a05BBBb94970c95",
+      "decimals": 18
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "yearn": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+      "compound": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "balancer": "https://ease.org/wp-content/uploads/2022/04/Balancer_logo.png",
+      "notional": "https://ease.org/wp-content/uploads/2022/04/Notional_logo.png",
+      "aave": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png",
+      "kashi": "https://ease.org/wp-content/uploads/2022/04/kashi-logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cTUSD",
+    "name": "cTUSD Ease Vault",
+    "address": "0xea5EdEF10af947A0D48De7de97d3155B191c8b94",
+    "display_name": "cTUSD",
+    "top_protocol": "compound",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png",
+    "info":"Navigate to the [Compound app], deposit True USD into their supply liquidity, then deposit the cTUSD tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.compound.finance/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cTUSD",
+      "name": "Compound TrueUSD",
+      "address": "0x12392F67bdf24faE0AF363c24aC620a2f67DAd86",
+      "decimals": 8
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "compound": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cvxFRAX3CRV-f",
+    "name": "cvxFRAX3CRV-f Ease Vault",
+    "address": "0xea5eDEF15Ed93529BF513F5b0d9DfAB44495781a",
+    "display_name": "cvxFRAX3CRV-f",
+    "top_protocol": "convex",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+    "info":"<b>Turn on the advanced toggle before executing any transaction with a pool on Convex.</b> Navigate to the frax (FRAX+3Crv) pool at [Convex’s app]. With the <b>advanced toggle on</b>, use the <b>Deposit only</b> function to add liquidity to the pool, then deposit the cvxFRAX3CRV-f tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://www.convexfinance.com/stake",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cvxFRAX3CRV-f",
+      "name": "Curve Factory USD Metapool: Frax Convex Deposit",
+      "address": "0xbE0F6478E0E4894CFb14f32855603A083A57c7dA",
+      "decimals": 18
+    },
+    "reward_tokens": ["crv","cvx"],
+    "protocols": {
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-yvCurve-stETH",
+    "name": "yvCurve-stETH Ease Vault",
+    "address": "0xEa5eDEF185427F1691C86eD2cF0742BBD35f9ecc",
+    "display_name": "yvCurve-stETH",
+    "top_protocol": "yearn",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+    "info":"Navigate to the [Yearn Curve-stETH Vault], deposit curve-stETH, ETH or WETH tokens into the vault, then deposit the yvCurve-stETH tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://yearn.finance/#/vault/0xdCD90C7f6324cfa40d7169ef80b12031770B4325",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "yvCurve-stETH",
+      "name": "Curve-stETH Yearn Vault",
+      "address": "0xdCD90C7f6324cfa40d7169ef80b12031770B4325",
+      "decimals": 18
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "yearn": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "lido": "https://ease.org/wp-content/uploads/2022/04/Lido_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-yvWETH",
+    "name": "yvWETH Ease Vault",
+    "address": "0xeA5Edef1983B46F04696aB545473719F308b106f",
+    "display_name": "yvWETH",
+    "top_protocol": "yearn",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+    "info":"Navigate to the [Yearn WETH Vault], deposit ETH or WETH tokens into the vault, then deposit the yvWtETH tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://yearn.finance/#/vault/0xa258C4606Ca8206D8aA700cE2143D7db854D168c",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "yvWETH",
+      "name": "WETH Yearn Vault",
+      "address": "0xa258C4606Ca8206D8aA700cE2143D7db854D168c",
+      "decimals": 18
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "yearn": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "lido": "https://ease.org/wp-content/uploads/2022/04/Lido_Logo.png",
+      "balancer": "https://ease.org/wp-content/uploads/2022/04/Balancer_logo.png",
+      "tokemak": "https://ease.org/wp-content/uploads/2022/04/tokemak_logo.webp",
+      "weth": "https://ease.org/wp-content/uploads/2022/04/WETH_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-yvUSDC",
+    "name": "yvUSDC Ease Vault",
+    "address": "0xea5eDeF155b0663BB7Cad73Df0BC06e24D9DdbDA",
+    "display_name": "yvUSDC",
+    "top_protocol": "yearn",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+    "info":"Navigate to the [Yearn USDC Vault], deposit USDC, ETH or WETH tokens into the vault, then deposit the yvUSDC tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://yearn.finance/#/vault/0xa354F35829Ae975e850e23e9615b11Da1B3dC4DE",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "yvUSDC",
+      "name": "USDC Yearn Vault",
+      "address": "0xa354F35829Ae975e850e23e9615b11Da1B3dC4DE",
+      "decimals": 6
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "yearn": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "aave": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png",
+      "balancer": "https://ease.org/wp-content/uploads/2022/04/Balancer_logo.png",
+      "notional": "https://ease.org/wp-content/uploads/2022/04/Notional_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": false
+  },
+  {
+    "symbol": "ez-yvCurve-IronBank",
+    "name": "yvCurve-IronBank Ease Vault",
+    "address": "0xeA5EdEF1FcF717327440646e7302ca058dDE844F",
+    "display_name": "yvCurve-IronBank",
+    "top_protocol": "yearn",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+    "info":"Navigate to the [Yearn Curve Iron Bank Vault], deposit CrvIB, ETH or WETH tokens into the vault, then deposit the yvCurve-IronBank tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://yearn.finance/#/vault/0x27b7b1ad7288079A66d12350c828D3C00A6F07d7",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "yvCurve-IronBank",
+      "name": "Curve-IronBank Yearn Vault",
+      "address": "0x27b7b1ad7288079A66d12350c828D3C00A6F07d7",
+      "decimals": 18
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "yearn": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+      "ironbank": "https://ease.org/wp-content/uploads/2022/04/IronBank_Logo.png",
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-yvCurve-stETH-WETH",
+    "name": "yvCurve-stETH-WETH Ease Vault",
+    "address": "0xEa5eDeF171C66e2F61C098621C2EA9565b3B3d84",
+    "display_name": "yvCurve-stETH-WETH",
+    "top_protocol": "yearn",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+    "info":"Navigate to the [Yearn Curve stEth-WETH Pool], deposit CrvIB, ETH or WETH tokens into the vault, then deposit the yvCurve-stETH-WETH tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://yearn.finance/#/vault/0x5faF6a2D186448Dfa667c51CB3D695c7A6E52d8E",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "yvCurve-stETH-WETH",
+      "name": "Curve stETH-WETH Pool yVault",
+      "address": "0x5faF6a2D186448Dfa667c51CB3D695c7A6E52d8E",
+      "decimals": 18
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "yearn": "https://ease.org/wp-content/uploads/2022/04/yearn_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "lido": "https://ease.org/wp-content/uploads/2022/04/Lido_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cDAI",
+    "name": "cDAI Ease Vault",
+    "address": "0xEA5eDef1430E6Fc88443F32F499fFFEE29d20C10",
+    "display_name": "cDAI",
+    "top_protocol": "compound",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png",
+    "info":"Navigate to the [Compound app], deposit DAI into their supply liquidity, then deposit the cDAI tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.compound.finance/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cDAI",
+      "name": "Compound DAI",
+      "address": "0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643",
+      "decimals": 8
+    },
+    "reward_tokens": ["comp"],
+    "protocols": {
+      "compound": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cUSDC",
+    "name": "cUSDC Ease Vault",
+    "address": "0xEa5EDeF17B9c91152E01C23A66AfFa7570047a84",
+    "display_name": "cUSDC",
+    "top_protocol": "compound",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png",
+    "info":"Navigate to the [Compound app], deposit USD Coin into their supply liquidity, then deposit the cUSDC tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.compound.finance/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cUSDC",
+      "name": "Compound USDC",
+      "address": "0x39AA39c021dfbaE8faC545936693aC917d5E7563",
+      "decimals": 8
+    },
+    "reward_tokens": ["comp"],
+    "protocols": {
+      "compound": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cSUSHI",
+    "name": "cSUSHI Ease Vault",
+    "address": "0xeA5eDEF17bdE66fA56Ea6EaC135ef83391D7e742",
+    "display_name": "cSUSHI",
+    "top_protocol": "compound",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png",
+    "info":"Navigate to the [Compound app], deposit Sushi Token into their supply liquidity, then deposit the cSUSHI tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.compound.finance/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cSUSHI",
+      "name": "Compound Sushi Token",
+      "address": "0x4B0181102A0112A2ef11AbEE5563bb4a3176c9d7",
+      "decimals": 8
+    },
+    "reward_tokens": [],
+    "protocols": {
+      "compound": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": false
+  },
+  {
+    "symbol": "ez-cUSDT",
+    "name": "cUSDT Ease Vault",
+    "address": "0xeA5EDef119bfAa99b0Bb67B0c03d085c345eD62A",
+    "display_name": "cUSDT",
+    "top_protocol": "compound",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png",
+    "info":"Navigate to the [Compound app], deposit Tether into their supply liquidity, then deposit the cUSDT tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.compound.finance/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cUSDT",
+      "name": "Compound USDT",
+      "address": "0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9",
+      "decimals": 8
+    },
+    "reward_tokens": ["comp"],
+    "protocols": {
+      "compound": "https://ease.org/wp-content/uploads/2022/04/compound_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-aFRAX",
+    "name": "aFRAX Ease Vault",
+    "address": "0xEA5eDef1144e20a207B689FE4B45220f8934271B",
+    "display_name": "aFRAX",
+    "top_protocol": "aave",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png",
+    "info":"Navigate to the [Aave app], deposit FRAX into their supply liquidity, then deposit the aFRAX tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.aave.com/markets/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "aFRAX",
+      "name": "Aave interest bearing FRAX",
+      "address": "0xd4937682df3C8aEF4FE912A96A74121C0829E664",
+      "decimals": 18
+    },
+    "reward_tokens": ["stkaave"],
+    "protocols": {
+      "aave": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-aUSDC",
+    "name": "aUSDC Ease Vault",
+    "address": "0xEA5eDEf19e3bDFc6Dbf9271eC57af97866FeA2E0",
+    "display_name": "aUSDC",
+    "top_protocol": "aave",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png",
+    "info":"Navigate to the [Aave app], deposit USD Coin into their supply liquidity, then deposit the aUSDC tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.aave.com/markets/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "aUSDC",
+      "name": "Aave interest bearing USDC",
+      "address": "0xBcca60bB61934080951369a648Fb03DF4F96263C",
+      "decimals": 6
+    },
+    "reward_tokens": ["stkaave"],
+    "protocols": {
+      "aave": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": false
+  },
+  {
+    "symbol": "ez-aDAI",
+    "name": "aDAI Ease Vault",
+    "address": "0xEA5eDEf14d71337C9B55eF50B0767FA89cd10eCF",
+    "display_name": "aDAI",
+    "top_protocol": "aave",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png",
+    "info":"Navigate to the [Aave app], deposit DAI into their supply liquidity, then deposit the aDAI tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.aave.com/markets/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "aDAI",
+      "name": "Aave interest bearing DAI",
+      "address": "0x028171bCA77440897B824Ca71D1c56caC55b68A3",
+      "decimals": 18
+    },
+    "reward_tokens": ["stkaave"],
+    "protocols": {
+      "aave": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-aCRV",
+    "name": "aCRV Ease Vault",
+    "address": "0xEA5eDEf156c03504dF1E4AE5F02E3cA27E79189D",
+    "display_name": "aCRV",
+    "top_protocol": "aave",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png",
+    "info":"Navigate to the [Aave app], deposit CRV into their supply liquidity, then deposit the aCRV tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.aave.com/markets/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "aCRV",
+      "name": "Aave interest bearing CRV",
+      "address": "0x8dAE6Cb04688C62d939ed9B68d32Bc62e49970b1",
+      "decimals": 18
+    },
+    "reward_tokens": ["stkaave"],
+    "protocols": {
+      "aave": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-aUSDT",
+    "name": "aUSDT Ease Vault",
+    "address": "0xea5EdEf11e35649D65539748f08b12A8f8133a91",
+    "display_name": "aUSDT",
+    "top_protocol": "aave",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png",
+    "info":"Navigate to the [Aave app], deposit Tether into their supply liquidity, then deposit the aUSDT tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.aave.com/markets/",
+    "protocol_type": "Lending Protocol",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/lending-protocols/",
+    "decimals": 18,
+    "token": {
+      "symbol": "aUSDT",
+      "name": "Aave interest bearing USDT",
+      "address": "0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811",
+      "decimals": 6
+    },
+    "reward_tokens": ["stkaave"],
+    "protocols": {
+      "aave": "https://ease.org/wp-content/uploads/2022/04/AAVE_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": false
+  },
+  {
+    "symbol": "ez-SLP-USDC-WETH",
+    "name": "USDC-WETH SLP Ease Vault",
+    "address": "0xea5eDEF1Fd0c0A943A28c8916D0907Dc8395504c",
+    "display_name": "SLP-USDC-WETH",
+    "top_protocol":"sushi",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+    "info":"Navigate to the [USDC-WETH pool] on the Sushi app, deposit liquidity, then deposit the USDC-WETH LP tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.sushi.com/add/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "protocol_type": "Decentralized Exchange",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-trading/decentralized-exchange-dex/",
+    "decimals": 18,
+    "token": {
+      "symbol": "SLP-USDC-WETH",
+      "name": "SushiSwap USDC/WETH LP",
+      "address": "0x397FF1542f962076d0BFE58eA045FfA2d347ACa0",
+      "decimals": 18
+    },
+    "reward_tokens": ["sushi"],
+    "protocols": {
+      "sushi": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+      "weth": "https://ease.org/wp-content/uploads/2022/04/WETH_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-SLP-WETH-USDT",
+    "name": "WETH-USDT SLP Ease Vault",
+    "address": "0xEA5eDEF17F0b70DD25Ab7d032e0EfF70A86bB7C5",
+    "display_name": "SLP-WETH-USDT",
+    "top_protocol":"sushi",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+    "info":"Navigate to the [WETH-USDT pool] on the Sushi app, deposit liquidity, then deposit the WETH-USDT LP tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.sushi.com/add/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    "protocol_type": "Decentralized Exchange",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-trading/decentralized-exchange-dex/",
+    "decimals": 18,
+    "token": {
+      "symbol": "SLP-WETH-USDT",
+      "name": "SushiSwap WETH/USDT LP",
+      "address": "0x06da0fd433C1A5d7a4faa01111c044910A184553",
+      "decimals": 18
+    },
+    "reward_tokens": ["sushi"],
+    "protocols": {
+      "sushi": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+      "weth": "https://ease.org/wp-content/uploads/2022/04/WETH_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-SLP-WBTC-WETH",
+    "name": "WBTC-WETH SLP Ease Vault",
+    "address": "0xeA5EDEf10f8255CD03541e8ff163a2836e0D7bd3",
+    "display_name": "SLP-WBTC-WETH",
+    "top_protocol":"sushi",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+    "info":"Navigate to the [WBTC-WETH pool] on the Sushi app, deposit liquidity, then deposit the WBTC-WETH LP tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.sushi.com/add/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "protocol_type": "Decentralized Exchange",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-trading/decentralized-exchange-dex/",
+    "decimals": 18,
+    "token": {
+      "symbol": "SLP-WBTC-WETH",
+      "name": "SushiSwap WBTC/WETH LP",
+      "address": "0xCEfF51756c56CeFFCA006cD410B03FFC46dd3a58",
+      "decimals": 18
+    },
+    "reward_tokens": ["sushi"],
+    "protocols": {
+      "sushi": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+      "weth": "https://ease.org/wp-content/uploads/2022/04/WETH_logo.png",
+      "wbtc": "https://ease.org/wp-content/uploads/2022/04/wbtc_network.svg"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-SLP-BIT-WETH",
+    "name": "BIT-WETH SLP Ease Vault",
+    "address": "0xEa5eDEF1071B053D5b4F291EfFCA24156462BC59",
+    "display_name": "SLP-BIT-WETH",
+    "top_protocol":"sushi",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+    "info":"Navigate to the [BIT-WETH pool] on the Sushi app, deposit liquidity, then deposit the BIT-WETH LP tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.sushi.com/add/0x1A4b46696b2bB4794Eb3D4c26f1c55F9170fa4C5/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "protocol_type": "Decentralized Exchange",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-trading/decentralized-exchange-dex/",
+    "decimals": 18,
+    "token": {
+      "symbol": "SLP-BIT-WETH",
+      "name": "SushiSwap BIT/WETH LP",
+      "address": "0xE12af1218b4e9272e9628D7c7Dc6354D137D024e",
+      "decimals": 18
+    },
+    "reward_tokens": ["bit", "sushi"],
+    "protocols": {
+      "sushi": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+      "weth": "https://ease.org/wp-content/uploads/2022/04/WETH_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-SLP-DAI-WETH",
+    "name": "DAI-WETH SLP Ease Vault",
+    "address": "0xEA5edeF1dedAaa78822C3624cE3e3B23f87bdb84",
+    "display_name": "SLP-DAI-WETH",
+    "top_protocol":"sushi",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+    "info":"Navigate to the [DAI-WETH pool] on the Sushi app, deposit liquidity, then deposit the DAI-WETH LP tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://app.sushi.com/add/0x6B175474E89094C44Da98b954EedeAC495271d0F/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "protocol_type": "Decentralized Exchange",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-trading/decentralized-exchange-dex/",
+    "decimals": 18,
+    "token": {
+      "symbol": "SLP-DAI-WETH",
+      "name": "SushiSwap DAI/WETH LP",
+      "address": "0xC3D03e4F041Fd4cD388c549Ee2A29a9E5075882f",
+      "decimals": 18
+    },
+    "reward_tokens": ["sushi"],
+    "protocols": {
+      "sushi": "https://ease.org/wp-content/uploads/2022/04/Sushi_Logo.png",
+      "weth": "https://ease.org/wp-content/uploads/2022/04/WETH_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cvxsteCRV",
+    "name": "cvxsteCRV Ease Vault",
+    "address": "0xea5eDEf1c6eD1be1BcbA4617A1C5A994E9018A43",
+    "display_name": "cvxsteCRV",
+    "top_protocol": "convex",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+    "info":"<b>Turn on the advanced toggle before executing any transaction with a pool on Convex.</b> Navigate to the stETH (ETH+stETH) pool at [Convex’s app]. With the <b>advanced toggle on</b>, use the <b>Deposit only</b> function to add liquidity to the pool, then deposit the cvxsteCRV tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://www.convexfinance.com/stake",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cvxsteCRV",
+      "name": "Curve ETH/stETH Convex Deposit",
+      "address": "0x9518c9063eB0262D791f38d8d6Eb0aca33c63ed0",
+      "decimals": 18
+    },
+    "reward_tokens": ["ldo", "crv", "cvx"],
+    "protocols": {
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "lido": "https://ease.org/wp-content/uploads/2022/04/Lido_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cvxcrvRenWBTC",
+    "name": "cvxcrvRenWBTC Ease Vault",
+    "address": "0xea5EdeF1531D8e8AE80D35636F2c81651E18Ba76",
+    "display_name": "cvxcrvRenWBTC",
+    "top_protocol": "convex",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+    "info":"<b>Turn on the advanced toggle before executing any transaction with a pool on Convex.</b> Navigate to the ren (renBTC+WBTC) pool at [Convex’s app]. With the <b>advanced toggle on</b>, use the <b>Deposit only</b> function to add liquidity to the pool, then deposit the cvxcrvRenWBTC tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://www.convexfinance.com/stake",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cvxcrvRenWBTC",
+      "name": "Curve RenBTC/WBTC Convex Deposit",
+      "address": "0x74b79021Ea6De3f0D1731fb8BdfF6eE7DF10b8Ae",
+      "decimals": 18
+    },
+    "reward_tokens": ["crv", "cvx"],
+    "protocols": {
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "wbtc": "https://ease.org/wp-content/uploads/2022/04/wbtc_network.svg",
+      "ren": "https://ease.org/wp-content/uploads/2022/04/ren_logo.svg"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cvxMIM-3LP3CRV-f",
+    "name": "cvxMIM-3LP3CRV-f Ease Vault",
+    "address": "0xea5Edef10f1012E74383E35D3809845D7cB84955",
+    "display_name": "cvxMIM-3LP3CRV-f",
+    "top_protocol": "convex",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+    "info":"<b>Turn on the advanced toggle before executing any transaction with a pool on Convex.</b> Navigate to the MIM (MIM+3Crv) pool at [Convex’s app]. With the <b>advanced toggle on</b>, use the <b>Deposit only</b> function to add liquidity to the pool, then deposit the cvxMIM-3LP3CRV-f tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://www.convexfinance.com/stake",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cvxMIM-3LP3CRV-f",
+      "name": "Curve Factory USD Metapool: MIM 3Pool Convex Deposit",
+      "address": "0xabB54222c2b77158CC975a2b715a3d703c256F05",
+      "decimals": 18
+    },
+    "reward_tokens": ["crv", "cvx"],
+    "protocols": {
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "abracadabra": "https://ease.org/wp-content/uploads/2022/04/MIM_Logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cvxcrv3crypto",
+    "name": "cvxcrv3crypto Ease Vault",
+    "address": "0xeA5edEf112577C107Fa395f2865CCE6Ec7224559",
+    "display_name": "cvxcrv3crypto",
+    "top_protocol": "convex",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+    "info":"<b>Turn on the advanced toggle before executing any transaction with a pool on Convex.</b> Navigate to the tricrypto2 (USDT+WBTC+WETH) pool at [Convex’s app]. With the <b>advanced toggle on</b>, use the <b>Deposit only</b> function to add liquidity to the pool, then deposit the Cvxcrv3crypto tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://www.convexfinance.com/stake",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cvxcrv3crypto",
+      "name": "Curve USD-BTC-ETH Convex Deposit",
+      "address": "0x903C9974aAA431A765e60bC07aF45f0A1B3b61fb",
+      "decimals": 18
+    },
+    "reward_tokens": ["crv", "cvx"],
+    "protocols": {
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "wbtc": "https://ease.org/wp-content/uploads/2022/04/wbtc_network.svg",
+      "ren": "https://ease.org/wp-content/uploads/2022/04/ren_logo.svg"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  },
+  {
+    "symbol": "ez-cvxcrvCVXETH",
+    "name": "cvxcrvCVXETH Ease Vault",
+    "address": "0xea5EDEF19979aBD627D0734E59E67BEDACDd3beD",
+    "display_name": "cvxcrvCVXETH",
+    "top_protocol": "convex",
+    "icon": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+    "info":"<b>Turn on the advanced toggle before executing any transaction with a pool on Convex.</b> Navigate to the cvxeth pool at [Convex’s app]. With the <b>advanced toggle on</b>, use the <b>Deposit only</b> function to add liquidity to the pool, then deposit the cvxcrvCVXETH tokens to Ease to receive perpetual, premium-free coverage.",
+    "info_link":"https://www.convexfinance.com/stake",
+    "protocol_type": "Yield Aggregator",
+    "type_link": "https://ease.org/learn-crypto-defi/how-to-defi/defi-101-protocols/yield-farming-aggregator-101-yearn-finance/",
+    "decimals": 18,
+    "token": {
+      "symbol": "cvxcrvCVXETH",
+      "name": "Curve CVX-ETH Convex Deposit",
+      "address": "0x0bC857f97c0554d1d0D602b56F2EEcE682016fBA",
+      "decimals": 18
+    },
+    "reward_tokens": ["crv", "cvx"],
+    "protocols": {
+      "convex": "https://ease.org/wp-content/uploads/2022/04/convex_logo.png",
+      "curve": "https://ease.org/wp-content/uploads/2022/04/Curve_Logo.webp",
+      "weth": "https://ease.org/wp-content/uploads/2022/04/WETH_logo.png"
+    },
+    "liquidation_amount": 0,
+    "percent_reserved": 0,
+    "enabled": true
+  }
+]

@@ -54,6 +54,9 @@ export type MainnetAddresses = {
   armorWhale: string;
   vArmor: string;
   vArmorWhale: string;
+  arNXMVault: string;
+  armorGov: string;
+  armorTimelock: string;
 };
 
 export type PermitSigArgs = {
