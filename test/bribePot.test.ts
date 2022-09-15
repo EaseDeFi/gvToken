@@ -338,7 +338,7 @@ describe("BribePot", function () {
         .deposit(aliceAddress, gvAmount);
       const bribePerWeek = parseEther("10");
       const rcaVaultAddress = RCA_VAULT;
-      const numOfWeeks = 0;
+      let numOfWeeks = 0;
       const totalBribeAmt = bribePerWeek.mul(numOfWeeks);
       const spender = contracts.bribePot.address;
       const deadline = (await getTimestamp()).add(1000);
@@ -350,6 +350,7 @@ describe("BribePot", function () {
         spender,
       });
 
+      // RANGE FLOOR TEST
       // adding bribe amount to pot with numOfWeeks 0 should revert
       await expect(
         contracts.bribePot
@@ -360,7 +361,21 @@ describe("BribePot", function () {
             r,
             s,
           })
-      ).to.revertedWith("number of weeks can't be zero");
+      ).to.revertedWith("bribe period beyond range");
+
+      // RANGE CEILING TEST
+      numOfWeeks = 53;
+      // adding bribe amount to pot with numOfWeeks 53 should revert
+      await expect(
+        contracts.bribePot
+          .connect(signers.briber)
+          .bribe(bribePerWeek, rcaVaultAddress, numOfWeeks, {
+            deadline,
+            v,
+            r,
+            s,
+          })
+      ).to.revertedWith("bribe period beyond range");
     });
     it("should not allow user to have multiple bribe for same vault", async function () {
       // call deposit
