@@ -156,13 +156,7 @@ async function main() {
   console.log(easeTokenAddress);
 
   // deploy bribePot
-  contracts.bribePot = <BribePot>(
-    await BribePotFactory.deploy(
-      gvTokenAddress,
-      easeTokenAddress,
-      RCA_CONTROLLER
-    )
-  );
+  contracts.bribePot = <BribePot>await BribePotFactory.deploy();
   await contracts.bribePot.deployed();
   console.log(`Bribe Pot deployed to ${contracts.bribePot.address}`);
   console.log(bribePotAddress);
@@ -221,6 +215,11 @@ async function main() {
   console.log(`Governance deployed to: `, bravoDelegator.address);
   console.log(govAddress);
 
+  await contracts.bribePot.initialize(
+    gvTokenAddress,
+    easeTokenAddress,
+    RCA_CONTROLLER
+  );
   // Fund tokenswap with ease token
   await contracts.ease.transfer(tokenSwapAddress, TOKENSWAP_TRANSFER_AMT);
 }
