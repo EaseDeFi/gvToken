@@ -90,7 +90,8 @@ contract BribePot is OwnableUpgradeable, UUPSUpgradeable {
         address indexed user,
         address indexed vault,
         uint256 bribePerWeek,
-        uint256 expiryWeek // this will always currentWeek + 1
+        uint256 endWeek, // Week that this was originally going to end
+        uint256 expiryWeek // this will always be currentWeek + 1
     );
 
     /* ========== MODIFIERS ========== */
@@ -265,7 +266,7 @@ contract BribePot is OwnableUpgradeable, UUPSUpgradeable {
             rewardsToken.safeTransfer(briber, amountToRefund);
         }
 
-        emit BribeCanceled(briber, vault, userBribe.rate, currWeek + 1);
+        emit BribeCanceled(briber, vault, userBribe.rate, userBribe.endWeek, currWeek + 1);
     }
 
     /* ========== VIEWS ========== */

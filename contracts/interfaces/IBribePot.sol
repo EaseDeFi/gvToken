@@ -25,8 +25,8 @@ interface IBribePot {
         address indexed user,
         address indexed vault,
         uint256 bribePerWeek,
-        uint256 expiryWeek, // this will always currentWeek + 1
-        uint256 endWeek
+        uint256 endWeek, // Week that this was ended
+        uint256 expiryWeek // this will always be currentWeek + 1
     );
 
     function deposit(address from, uint256 amount) external;
