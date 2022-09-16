@@ -266,7 +266,13 @@ contract BribePot is OwnableUpgradeable, UUPSUpgradeable {
             rewardsToken.safeTransfer(briber, amountToRefund);
         }
 
-        emit BribeCanceled(briber, vault, userBribe.rate, userBribe.endWeek, currWeek + 1);
+        emit BribeCanceled(
+            briber,
+            vault,
+            userBribe.rate,
+            userBribe.endWeek,
+            currWeek + 1
+        );
     }
 
     /* ========== VIEWS ========== */
