@@ -498,7 +498,13 @@ describe("BribePot", function () {
         contracts.bribePot.connect(signers.briber).cancelBribe(rcaVaultAddress)
       )
         .to.emit(contracts.bribePot, "BribeCanceled")
-        .withArgs(briberAddress, rcaVaultAddress, bribePerWeek, currWeek);
+        .withArgs(
+          briberAddress,
+          rcaVaultAddress,
+          bribePerWeek,
+          currWeek.add(3),
+          currWeek
+        );
 
       const userEaseBalAfter = await contracts.ease.balanceOf(briberAddress);
       expect(userEaseBalAfter.sub(userEaseBalBefore)).to.equal(
