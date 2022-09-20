@@ -1,9 +1,9 @@
 import { BalanceNode } from "./types";
 import BalanceTree from "../test/helpers/balance-tree";
-import { getBalanceNodes } from "./helpers";
+import { getEaseBalanceNodes } from "./helpers";
 
 export async function getVArmorHoldersTree(): Promise<BalanceTree> {
-  const balanceNodes: BalanceNode[] = getBalanceNodes();
+  const balanceNodes: BalanceNode[] = getEaseBalanceNodes();
   // create tree
   return new BalanceTree(balanceNodes);
 }

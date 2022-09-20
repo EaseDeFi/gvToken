@@ -181,7 +181,16 @@ export async function getFormattedBalanceNodes(): Promise<BalanceNode[]> {
   return balances;
 }
 
-export function getBalanceNodes(): BalanceNode[] {
+export function getEaseBalanceNodes(): BalanceNode[] {
+  const balanceNodes = getVarmorBalanceNodes();
+  for (const node of balanceNodes) {
+    // change vArmor amount to easeAmount by applying exchange rate
+    node.amount = node.amount.mul(VARMOR_EXCHANGE_RATE).div(BUFFER);
+  }
+  return balanceNodes;
+}
+
+export function getVarmorBalanceNodes(): BalanceNode[] {
   const balanceNodesPath = path.resolve(
     __dirname,
     "formattedData",
@@ -196,7 +205,6 @@ export function getBalanceNodes(): BalanceNode[] {
       depositStart: BigNumber.from(balNode.depositStart),
       amount: BigNumber.from(balNode.amount),
     };
-    node.amount = node.amount.mul(VARMOR_EXCHANGE_RATE).div(BUFFER);
     balanceNodes.push(node);
   }
   return balanceNodes;

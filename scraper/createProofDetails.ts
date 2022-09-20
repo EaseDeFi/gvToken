@@ -1,26 +1,38 @@
 import path from "path";
 import fs from "fs-extra";
 import BalanceTree from "../test/helpers/balance-tree";
-import { getBalanceNodes } from "./helpers";
+import { getEaseBalanceNodes, getVarmorBalanceNodes } from "./helpers";
 type ProofDetail = {
   proof: string[];
-  amount: string;
+  easeAmount: string;
   address: string;
+  vArmorAmount: string;
+  depositStart: string;
 };
 
 (function () {
   const proofDetails: ProofDetail[] = [];
-  const balanceNodes = getBalanceNodes();
+  const vArmorBalanceNodes = getVarmorBalanceNodes();
+  const balanceNodes = getEaseBalanceNodes();
   const tree = new BalanceTree(balanceNodes);
-  for (const node of balanceNodes) {
+  // Check in case I mess things up
+  if (balanceNodes.length != vArmorBalanceNodes.length) {
+    throw new Error("Ease Balance node and vArmor Balance Nodes mismatch!");
+  }
+
+  for (let i = 0; i < balanceNodes.length; i++) {
+    const node = balanceNodes[i];
     const proof = tree.getProof(node.account, node.amount, node.depositStart);
     const proofDetail: ProofDetail = {
       address: node.account,
-      amount: node.amount.toString(),
+      easeAmount: node.amount.toString(),
+      depositStart: node.depositStart.toString(),
+      vArmorAmount: vArmorBalanceNodes[i].amount.toString(),
       proof,
     };
     proofDetails.push(proofDetail);
   }
+
   const proofDetailsPath = path.resolve(
     __dirname,
     "formattedData",
