@@ -1,14 +1,14 @@
 import "@nomiclabs/hardhat-ethers";
 import { BigNumber } from "ethers";
-import { parseEther } from "ethers/lib/utils";
+// import { parseEther } from "ethers/lib/utils";
 import { ethers } from "hardhat";
-import { DEPLOYED_ADDRESSES } from "../../constants";
+// import { DEPLOYED_ADDRESSES } from "../../constants";
 import { GovernorBravoDelegate, IERC20, Timelock } from "../../src/types";
 import { MAINNET_ADDRESSES, RCA_CONTROLLER } from "../../test/constants";
 import { Contracts } from "../../test/types";
-import { getActiveRcaVaults } from "./helpers";
+// import { getActiveRcaVaults } from "./helpers";
 import { config } from "dotenv";
-import axios from "axios";
+// import axios from "axios";
 
 config();
 
@@ -26,23 +26,23 @@ async function main() {
   };
 
   //********************** CHECK ENV VARIABLES *******************
-  const {
-    TENDERLY_FORK,
-    TENDERLY_USERNAME,
-    TENDERLY_PROJECT,
-    TENDERLY_ACCESS_KEY,
-  } = process.env;
-  if (
-    [
-      TENDERLY_ACCESS_KEY,
-      TENDERLY_USERNAME,
-      TENDERLY_FORK,
-      TENDERLY_PROJECT,
-    ].includes(undefined)
-  ) {
-    throw new Error("Please set the env variables correctly!");
-  }
-  const SIMULATE_API = `https://api.tenderly.co/api/v1/account/${TENDERLY_USERNAME}/project/${TENDERLY_PROJECT}/simulate`;
+  // const {
+  //   TENDERLY_FORK,
+  //   TENDERLY_USERNAME,
+  //   TENDERLY_PROJECT,
+  //   TENDERLY_ACCESS_KEY,
+  // } = process.env;
+  // if (
+  //   [
+  //     TENDERLY_ACCESS_KEY,
+  //     TENDERLY_USERNAME,
+  //     TENDERLY_FORK,
+  //     TENDERLY_PROJECT,
+  //   ].includes(undefined)
+  // ) {
+  //   throw new Error("Please set the env variables correctly!");
+  // }
+  // const SIMULATE_API = `https://api.tenderly.co/api/v1/account/${TENDERLY_USERNAME}/project/${TENDERLY_PROJECT}/simulate`;
 
   //********************** INITIATE CONTRACTS *******************
   const contracts = {} as Contracts;
@@ -72,26 +72,26 @@ async function main() {
   ]);
 
   // ********************** CHECK PENDING GOV *******************
-  console.log("Checking if pending gov is empty!");
-  const PENDING_OWNER_LOCATION = 6;
-  const activeRcaVaults = getActiveRcaVaults();
-  const targets = [MAINNET_ADDRESSES.armor, RCA_CONTROLLER, ...activeRcaVaults];
+  // console.log("Checking if pending gov is empty!");
+  // const PENDING_OWNER_LOCATION = 6;
+  // const activeRcaVaults = getActiveRcaVaults();
+  // const targets = [MAINNET_ADDRESSES.armor, RCA_CONTROLLER, ...activeRcaVaults];
 
-  // pending owner's should be empty before executing proposals
-  for (let i = 1; i < targets.length; i++) {
-    let pendingOwnerStorageLocation = PENDING_OWNER_LOCATION;
-    const target = targets[i];
-    if (i === 1) {
-      pendingOwnerStorageLocation = 1;
-    }
-    const pendingOwner = await ethers.provider.getStorageAt(
-      target,
-      pendingOwnerStorageLocation
-    );
-    if (pendingOwner !== ethers.constants.HashZero) {
-      throw new Error("Pending gov storage not empty!");
-    }
-  }
+  // // pending owner's should be empty before executing proposals
+  // for (let i = 1; i < targets.length; i++) {
+  //   let pendingOwnerStorageLocation = PENDING_OWNER_LOCATION;
+  //   const target = targets[i];
+  //   if (i === 1) {
+  //     pendingOwnerStorageLocation = 1;
+  //   }
+  //   const pendingOwner = await ethers.provider.getStorageAt(
+  //     target,
+  //     pendingOwnerStorageLocation
+  //   );
+  //   if (pendingOwner !== ethers.constants.HashZero) {
+  //     throw new Error("Pending gov storage not empty!");
+  //   }
+  // }
 
   const proposalId = 5;
   // const vArmorWhales = [
@@ -177,34 +177,35 @@ async function main() {
   await contracts.easeGovernance.connect(signer).execute(proposalId);
   await contracts.easeGovernance.connect(signer).execute(proposalId + 1);
   await contracts.easeGovernance.connect(signer).execute(proposalId + 2);
-  // VERIFY
-  console.log("Verifying the proposal updates....");
-  for (let i = 0; i < targets.length; i++) {
-    const target = targets[i];
-    if (i > 0) {
-      let pendingOwnerStorageLocation = PENDING_OWNER_LOCATION;
-      if (i === 1) {
-        pendingOwnerStorageLocation = 1;
-      }
-      const _pendingOwner = await ethers.provider.getStorageAt(
-        target,
-        pendingOwnerStorageLocation
-      );
-      const pendingOwner = "0x" + _pendingOwner.slice(26);
-      if (pendingOwner !== DEPLOYED_ADDRESSES.timelock) {
-        console.log(`Pending owner of ${target} not updated!!`);
-      }
-    } else {
-      // check balance
-      const expectedBalance = parseEther("400000000");
-      const timelockArmorBalance = await contracts.armor.balanceOf(
-        DEPLOYED_ADDRESSES.timelock
-      );
-      if (!timelockArmorBalance.gte(expectedBalance)) {
-        console.log("proposal did not update easeTimelock balance");
-      }
-    }
-  }
+
+  // // VERIFY
+  // console.log("Verifying the proposal updates....");
+  // for (let i = 0; i < targets.length; i++) {
+  //   const target = targets[i];
+  //   if (i > 0) {
+  //     let pendingOwnerStorageLocation = PENDING_OWNER_LOCATION;
+  //     if (i === 1) {
+  //       pendingOwnerStorageLocation = 1;
+  //     }
+  //     const _pendingOwner = await ethers.provider.getStorageAt(
+  //       target,
+  //       pendingOwnerStorageLocation
+  //     );
+  //     const pendingOwner = "0x" + _pendingOwner.slice(26);
+  //     if (pendingOwner !== DEPLOYED_ADDRESSES.timelock) {
+  //       console.log(`Pending owner of ${target} not updated!!`);
+  //     }
+  //   } else {
+  //     // check balance
+  //     const expectedBalance = parseEther("400000000");
+  //     const timelockArmorBalance = await contracts.armor.balanceOf(
+  //       DEPLOYED_ADDRESSES.timelock
+  //     );
+  //     if (!timelockArmorBalance.gte(expectedBalance)) {
+  //       console.log("proposal did not update easeTimelock balance");
+  //     }
+  //   }
+  // }
 }
 
 main().catch((error) => {
