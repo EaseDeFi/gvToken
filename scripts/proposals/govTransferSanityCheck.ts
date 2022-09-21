@@ -77,6 +77,7 @@ async function main() {
   const activeRcaVaults = getActiveRcaVaults();
   const targets = [MAINNET_ADDRESSES.armor, RCA_CONTROLLER, ...activeRcaVaults];
 
+  // pending owner's should be empty before executing proposals
   for (let i = 1; i < targets.length; i++) {
     let pendingOwnerStorageLocation = PENDING_OWNER_LOCATION;
     const target = targets[i];
@@ -177,14 +178,21 @@ async function main() {
   await contracts.easeGovernance.connect(signer).execute(proposalId + 1);
   await contracts.easeGovernance.connect(signer).execute(proposalId + 2);
   // VERIFY
+  console.log("Verifying the proposal updates....");
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i];
     if (i > 0) {
-      // check pending governor
-      const pendingOwner = await ethers.provider.getStorageAt(target, 6);
-      // TODO:
+      let pendingOwnerStorageLocation = PENDING_OWNER_LOCATION;
+      if (i === 1) {
+        pendingOwnerStorageLocation = 1;
+      }
+      const _pendingOwner = await ethers.provider.getStorageAt(
+        target,
+        pendingOwnerStorageLocation
+      );
+      const pendingOwner = "0x" + _pendingOwner.slice(26);
       if (pendingOwner !== DEPLOYED_ADDRESSES.timelock) {
-        console.log("Pending owner not updated!");
+        console.log(`Pending owner of ${target} not updated!!`);
       }
     } else {
       // check balance
@@ -192,15 +200,10 @@ async function main() {
       const timelockArmorBalance = await contracts.armor.balanceOf(
         DEPLOYED_ADDRESSES.timelock
       );
-      if (!expectedBalance.eq(timelockArmorBalance)) {
-        console.log("proposal did not execute correctly");
+      if (!timelockArmorBalance.gte(expectedBalance)) {
+        console.log("proposal did not update easeTimelock balance");
       }
     }
-  }
-  if (contracts.easeGovernance !== undefined) {
-    console.log("Votes executed and updated successfully!");
-  } else {
-    console.log("!!!!!! Update Failed !!!!!!");
   }
 }
 
