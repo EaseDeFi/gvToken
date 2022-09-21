@@ -7,7 +7,7 @@ export const MAINNET_ADDRESSES: MainnetAddresses = {
   vArmor: "0x5afeDef11AA9CD7DaE4023807810d97C20791dEC",
   vArmorWhale: "0xD0e72c1B2eb87e3DC0445b7f689CaDcFc872b293",
   arNXMVault: "0x1337def1fc06783d4b03cb8c1bf3ebf7d0593fc4",
-  armorGov: "0x5afEDef1EeB6e354af794b3787Da05441192914e",
+  armorGov: "0x5aFeDeF1454CDd11d4705c06aa4D66Aa396343f6",
   armorTimelock: "0x5AFeDEF13Bd7B3e363db724420D773cAa8B88763",
 };
 
